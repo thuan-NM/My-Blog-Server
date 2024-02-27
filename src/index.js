@@ -8,7 +8,8 @@ const usersRouter = require("./routes/users")
 const companyAuthRouter = require("./routes/companyAuth")
 const companiesRouter = require("./routes/companies")
 const commentsRoute = require("./routes/comments");
-const reactsRouter =require("./routes/reacts")
+const reactsRouter = require("./routes/reacts")
+const overviewsRoute = require("./routes/overviews")
 const { connectDb } = require("./utils/connectDb");
 
 
@@ -20,10 +21,11 @@ app.use(bodyParser.json());
 app.use("/posts", postsRouter);
 app.use("/auth", authRouter);
 app.use("/users", usersRouter);
-app.use("/companyauth", companyAuthRouter)
-app.use("/companies",companiesRouter)
+app.use("/companyauth", companyAuthRouter);
+app.use("/companies",companiesRouter);
 app.use("/comments",commentsRoute);
-app.use("/reactions", reactsRouter )
+app.use("/reactions", reactsRouter );
+app.use("/overviews",overviewsRoute);
 
 app.listen(port, () => {
     console.log(`Listenning on port ${port}`);

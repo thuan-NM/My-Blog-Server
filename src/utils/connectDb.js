@@ -15,6 +15,8 @@ async function connectDb() {
   db.comments = database.collection("comments");
   db.reactions = database.collection("reactions");
   db.companies = database.collection("companies");
+  db.overviews = database.collection("overviews");
+  db.companies = database.collection("skills");
 }
 
 module.exports = { connectDb, db };

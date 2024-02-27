@@ -148,7 +148,7 @@ const createPost = async (req, res) => {
     await db.posts.insertOne(post);
 
     res.status(201).json({
-      message: "Create a post successful",
+      message: "Create a post successfully",
       data: post,
       isSuccess: true,
     });
