@@ -9,7 +9,7 @@ const getCommentByPostId = async (req, res) => {
     try {
       const postId = req.params;
       const comments = await db.comments.find({ postId: new ObjectId(postId) })
-        .sort({ createdAt: -1 }) // Sort in descending order based on createdAt
+        .sort({ createdAt: 1 }) // Sort in descending order based on createdAt
         .toArray();
       
       const totalComments = await db.comments.countDocuments({

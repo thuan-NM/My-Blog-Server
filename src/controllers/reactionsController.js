@@ -12,21 +12,11 @@ const getReactionStats = async (req, res) => {
       postId: new ObjectId(postId),
     });
 
+    const reactions = await db.reactions.find({ postId: new ObjectId(postId) }).toArray()
     // Calculate counts for each reaction type
-    const reactionCounts = {};
-    const reactionTypes = ['like', 'heart', 'sad', 'angry']; // Add more types if needed
-
-    for (const reactionType of reactionTypes) {
-      const count = await db.reactions.countDocuments({
-        postId: new ObjectId(postId),
-        reactionType,
-      });
-      reactionCounts[reactionType] = count;
-    }
-
     res.status(200).json({
       message: "Get reaction stats successful",
-      data: { totalReactions, reactionCounts },
+      data: { totalReactions,reactions },
       isSuccess: true,
     });
   } catch (error) {
@@ -42,31 +32,24 @@ const handleReaction = async (req, res) => {
     try {
       
       const postId = req.params.id
-      const { userId, reactionType } = req.body;
-      console.log(postId , userId, reactionType);
+      const { userId } = req.body;
   
       // Check if the user has already reacted
       const existingReaction = await db.reactions.findOne({
         postId: new ObjectId(postId),
         userId: new ObjectId(userId),
       });
-      if(reactionType === "X"){
-        await db.reactions.deleteOne(
-          { _id: existingReaction._id },
-        );
+      if (existingReaction!=null)
+      {
+        await db.reactions.deleteOne({
+          _id: existingReaction._id
+        })
       }
-      if (existingReaction) {
-        // If the user has already reacted, update the reaction type
-        await db.reactions.updateOne(
-          { _id: existingReaction._id },
-          { $set: { reactionType } }
-        );
-      } else {
+      else{
         // If the user hasn't reacted, create a new reaction
         await db.reactions.insertOne({
           postId: new ObjectId(postId),
           userId: new ObjectId(userId),
-          reactionType,
         });
       }
   
@@ -80,7 +63,6 @@ const handleReaction = async (req, res) => {
         data: {
           postId,
           totalReactions,
-          reactionType,
           existingReaction, // Include user's reaction information in the response
         },
         isSuccess: true,

@@ -9,12 +9,15 @@ const postsRouter = express.Router();
 postsRouter.get("/", postsController.getPosts);
 
 postsRouter.get("/search", postsController.searchPosts);
-
+postsRouter.get("/topjob", postsController.getTopPosts);
+postsRouter.get("/mostinterest", postsController.getMostInterestPosts);
 postsRouter.get("/:id", postsController.getPostById);
 
 postsRouter.get("/user/:id", postsController.getPostByUserId);
 // CREATE new post
 postsRouter.post("/", verifyAuth, postsController.createPost);
+
+postsRouter.post("/filter", verifyAuth, postsController.getFilterPost);
 
 // UPDATE post
 postsRouter.put("/:id", postsController.updatePost);

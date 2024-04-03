@@ -270,6 +270,7 @@ const searchUsers = async (req, res) => {
 
 
 const updatePictures=async (req, res) => {
+  console.log(req)
   try {
     // Kiểm tra xem có file được tải lên hay không
     if (!req.file) {
