@@ -15,6 +15,7 @@ const reactsRouter = require("./routes/reacts");
 const overviewsRoute = require("./routes/overviews");
 const experiencesRoute = require("./routes/experiences");
 const educationsRoute = require("./routes/educations");
+const jobstatusRoute = require("./routes/jobstatus")
 
 const app = express();
 const port = 3001;
@@ -32,6 +33,7 @@ app.use("/reactions", reactsRouter);
 app.use("/overviews", overviewsRoute);
 app.use("/experiences", experiencesRoute);
 app.use("/educations", educationsRoute);
+app.use("/jobstatus", jobstatusRoute);
 
 const server = http.createServer(app);
 server.listen(port, () => {
@@ -41,6 +43,6 @@ server.listen(port, () => {
 
 server.on("upgrade", (request, socket, head) => {
     wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit("connection", ws, request);
+        wss.emit("connection", (ws), request);
     });
 });
