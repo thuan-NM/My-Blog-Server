@@ -4,8 +4,6 @@ const { db } = require("../utils/connectDb");
 const getJobStatus = async (req, res) => {
     try {
         const { postid, userid } = req.body;
-
-        // Validate that the ids are valid ObjectIds
         if (!ObjectId.isValid(postid) || !ObjectId.isValid(userid)) {
             return res.status(400).json({
                 message: 'Invalid post ID or user ID format',
@@ -13,23 +11,17 @@ const getJobStatus = async (req, res) => {
                 isSuccess: false,
             });
         }
-
         const jobstatus = await db.jobstatus.find({
             postid: new ObjectId(postid),
             userid: new ObjectId(userid),
         }).toArray();
-
-
         if (!jobstatus) {
-            // Job status not found
             return res.status(404).json({
                 message: 'Job status not found',
                 data: null,
                 isSuccess: false,
             });
         }
-
-        // Job status found
         return res.status(200).json({
             message: 'Get job status successful',
             data: jobstatus,
@@ -44,13 +36,10 @@ const getJobStatus = async (req, res) => {
         });
     }
 };
-
 const updateJobStatus = async (req, res) => {
     const { status, candidateInfo } = req.body;
     try {
         const id = req.params.id;
-
-        // Validate that the id is a valid ObjectId
         if (!ObjectId.isValid(id)) {
             return res.status(400).json({
                 message: 'Invalid job status ID format',
@@ -58,7 +47,6 @@ const updateJobStatus = async (req, res) => {
                 isSuccess: false,
             });
         }
-
         await db.jobStatus.updateOne(
             { _id: new ObjectId(id) },
             {
@@ -86,15 +74,24 @@ const createJobStatus = async (req, res) => {
     const { postid, userid, status, candidateInfo } = req.body;
     console.log(candidateInfo);
     try {
+        const existingJobStatus = await db.jobstatus.findOne({
+            postid: new ObjectId(postid),
+            userid: new ObjectId(userid),
+        });
+        if (existingJobStatus && existingJobStatus.status !== 'Denied') {
+            return res.status(400).json({
+                message: 'You have already applied for this job',
+                data: null,
+                isSuccess: false,
+            });
+        }
         const newJobStatus = {
             postid: new ObjectId(postid),
             userid: new ObjectId(userid),
             status,
             candidateInfo,
         };
-
         const result = await db.jobstatus.insertOne(newJobStatus);
-
         if (result.acknowledged) {
             res.status(201).json({
                 message: "Create job status successful",
@@ -113,12 +110,9 @@ const createJobStatus = async (req, res) => {
         });
     }
 };
-
 const getJobStatusByAuthor = async (req, res) => {
     try {
         const authorid = req.params;
-
-        // Validate that the id is a valid ObjectId
         if (!ObjectId.isValid(authorid)) {
             return res.status(400).json({
                 message: 'Invalid user ID format',
@@ -126,13 +120,9 @@ const getJobStatusByAuthor = async (req, res) => {
                 isSuccess: false,
             });
         }
-
-        // Get the posts associated with the authorid
         const posts = await db.posts.find({
             "author._id": new ObjectId(authorid),
         }).toArray();
-
-        // For each post, find the count of jobstatus
         for (let post of posts) {
             const jobStatusCount = await db.jobstatus.countDocuments({
                 postid: new ObjectId(post._id),
@@ -143,8 +133,7 @@ const getJobStatusByAuthor = async (req, res) => {
                 status: "Applied"
             }).toArray();
             post.jobStatusCount = jobStatusCount;
-            // Khởi tạo post.userapply như một array trước khi thêm các phần tử
-            post.userapply = []; // Thêm dòng này
+            post.userapply = [];
             for (let job of jobStatusItem) {
                 const user = await db.users.findOne({
                     _id: new ObjectId(job.userid),
@@ -154,11 +143,9 @@ const getJobStatusByAuthor = async (req, res) => {
                     info: job.candidateInfo,
                     status: job.status,
                 }
-                // Bây giờ bạn có thể sử dụng spread operator mà không gặp lỗi
                 post.userapply = [...post.userapply, data];
             }
         }
-        // Return the posts with job status count
         return res.status(200).json({
             message: 'Get job status by author successful',
             data: posts,
@@ -173,14 +160,11 @@ const getJobStatusByAuthor = async (req, res) => {
         });
     }
 };
-
 const hireCandidate = async (req, res) => {
     const { postid } = req.body;
-    const userid=req.params.id
+    const userid = req.params.id
     console.log(postid)
     console.log(userid)
-
-    // Validate that the ids are valid ObjectIds
     if (!ObjectId.isValid(userid) || !ObjectId.isValid(postid)) {
         return res.status(400).json({
             message: 'Invalid user ID or post ID format',
@@ -188,14 +172,11 @@ const hireCandidate = async (req, res) => {
             isSuccess: false,
         });
     }
-
     try {
-        // Update the job status of the user to 'Hired'
         await db.jobstatus.updateOne(
             { userid: new ObjectId(userid), postid: new ObjectId(postid) },
             { $set: { status: 'Hired' } },
         );
-        // Return success response
         return res.status(200).json({
             message: 'Tuyển thành công',
             data: null,
@@ -210,12 +191,9 @@ const hireCandidate = async (req, res) => {
         });
     }
 };
-
 const denyCandidate = async (req, res) => {
     const { postid } = req.body;
-    const userid=req.params.id
-
-    // Validate that the ids are valid ObjectIds
+    const userid = req.params.id
     if (!ObjectId.isValid(userid) || !ObjectId.isValid(postid)) {
         return res.status(400).json({
             message: 'Invalid user ID or post ID format',
@@ -223,15 +201,11 @@ const denyCandidate = async (req, res) => {
             isSuccess: false,
         });
     }
-
     try {
-        // Update the job status of the user to 'Denied'
         await db.jobstatus.updateOne(
             { userid: new ObjectId(userid), postid: new ObjectId(postid) },
             { $set: { status: 'Denied' } }
         );
-
-        // Return success response
         return res.status(200).json({
             message: 'Candidate has been denied successfully',
             data: null,
@@ -246,6 +220,111 @@ const denyCandidate = async (req, res) => {
         });
     }
 };
+const getUserAppliedPosts = async (req, res) => {
+    try {
+        const { userId, statusdata } = req.query;
+        if (!ObjectId.isValid(userId)) {
+            return res.status(400).json({
+                message: 'Invalid user ID format',
+                data: null,
+                isSuccess: false,
+            });
+        }
+        const jobStatuses = await db.jobstatus.find({
+            userid: new ObjectId(userId),
+            status: statusdata
+        }).toArray();
+        let posts = [];
+        for (let jobStatus of jobStatuses) {
+            const post = await db.posts.findOne({
+                _id: new ObjectId(jobStatus.postid),
+            });
+            if (post) {
+                posts.push(post);
+                post.status = jobStatus
+            }
+        }
+        console.log(posts)
+        return res.status(200).json({
+            message: 'Get user applied posts successful',
+            data: posts,
+            isSuccess: true,
+        });
+    } catch (error) {
+        console.error('Error fetching user applied posts:', error);
+        res.status(500).json({
+            message: 'Failed to fetch user applied posts',
+            data: null,
+            isSuccess: false,
+        });
+    }
+};
+const deleteJobStatus = async (req, res) => {
+    const { id } = req.params;
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).json({
+            message: 'Invalid job status ID format',
+            data: null,
+            isSuccess: false,
+        });
+    }
+    try {
+        const result = await db.jobstatus.deleteOne({ _id: new ObjectId(id) });
+        if (result.deletedCount === 1) {
+            res.status(200).json({
+                message: 'Delete job status successful',
+                data: null,
+                isSuccess: true,
+            });
+        } else {
+            throw new Error('Job status not found');
+        }
+    } catch (error) {
+        console.error('Error deleting job status:', error);
+        res.status(500).json({
+            message: 'Failed to delete job status',
+            data: null,
+            isSuccess: false,
+        });
+    }
+};
+const checkUserApplied = async (req, res) => {
+    const { postid, userid } = req.query;
+
+    if (!ObjectId.isValid(postid) || !ObjectId.isValid(userid)) {
+        return res.status(400).json({
+            message: 'Invalid post ID or user ID format',
+            data: null,
+            isSuccess: false,
+        });
+    }
+    try {
+        const jobstatus = await db.jobstatus.findOne({
+            postid: new ObjectId(postid),
+            userid: new ObjectId(userid),
+        });
+        if (!jobstatus || jobstatus.status === 'Denied') {
+            return res.status(200).json({
+                message: 'User has not applied or was denied',
+                data: null,
+                isSuccess: true,
+            });
+        } else {
+            return res.status(200).json({
+                message: 'User has already applied',
+                data: jobstatus,
+                isSuccess: true,
+            });
+        }
+    } catch (error) {
+        console.error('Error checking user application:', error);
+        res.status(500).json({
+            message: 'Failed to check user application',
+            data: null,
+            isSuccess: false,
+        });
+    }
+};
 
 module.exports = {
     getJobStatus,
@@ -254,5 +333,8 @@ module.exports = {
     getJobStatusByAuthor,
     hireCandidate,
     denyCandidate,
+    getUserAppliedPosts,
+    deleteJobStatus,
+    checkUserApplied
 };
 
