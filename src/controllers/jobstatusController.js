@@ -136,9 +136,11 @@ const getJobStatusByAuthor = async (req, res) => {
         for (let post of posts) {
             const jobStatusCount = await db.jobstatus.countDocuments({
                 postid: new ObjectId(post._id),
+                status: "Applied"
             });
             const jobStatusItem = await db.jobstatus.find({
                 postid: new ObjectId(post._id),
+                status: "Applied"
             }).toArray();
             post.jobStatusCount = jobStatusCount;
             // Khởi tạo post.userapply như một array trước khi thêm các phần tử
@@ -147,11 +149,15 @@ const getJobStatusByAuthor = async (req, res) => {
                 const user = await db.users.findOne({
                     _id: new ObjectId(job.userid),
                 });
+                const data = {
+                    user: user,
+                    info: job.candidateInfo,
+                    status: job.status,
+                }
                 // Bây giờ bạn có thể sử dụng spread operator mà không gặp lỗi
-                post.userapply = [...post.userapply, user];
+                post.userapply = [...post.userapply, data];
             }
         }
-        console.log(posts)
         // Return the posts with job status count
         return res.status(200).json({
             message: 'Get job status by author successful',
@@ -168,9 +174,85 @@ const getJobStatusByAuthor = async (req, res) => {
     }
 };
 
+const hireCandidate = async (req, res) => {
+    const { postid } = req.body;
+    const userid=req.params.id
+    console.log(postid)
+    console.log(userid)
+
+    // Validate that the ids are valid ObjectIds
+    if (!ObjectId.isValid(userid) || !ObjectId.isValid(postid)) {
+        return res.status(400).json({
+            message: 'Invalid user ID or post ID format',
+            data: null,
+            isSuccess: false,
+        });
+    }
+
+    try {
+        // Update the job status of the user to 'Hired'
+        await db.jobstatus.updateOne(
+            { userid: new ObjectId(userid), postid: new ObjectId(postid) },
+            { $set: { status: 'Hired' } },
+        );
+        // Return success response
+        return res.status(200).json({
+            message: 'Tuyển thành công',
+            data: null,
+            isSuccess: true,
+        });
+    } catch (error) {
+        console.error('Error hiring candidate:', error);
+        res.status(500).json({
+            message: 'Tuyển không thành công',
+            data: null,
+            isSuccess: false,
+        });
+    }
+};
+
+const denyCandidate = async (req, res) => {
+    const { postid } = req.body;
+    const userid=req.params.id
+
+    // Validate that the ids are valid ObjectIds
+    if (!ObjectId.isValid(userid) || !ObjectId.isValid(postid)) {
+        return res.status(400).json({
+            message: 'Invalid user ID or post ID format',
+            data: null,
+            isSuccess: false,
+        });
+    }
+
+    try {
+        // Update the job status of the user to 'Denied'
+        await db.jobstatus.updateOne(
+            { userid: new ObjectId(userid), postid: new ObjectId(postid) },
+            { $set: { status: 'Denied' } }
+        );
+
+        // Return success response
+        return res.status(200).json({
+            message: 'Candidate has been denied successfully',
+            data: null,
+            isSuccess: true,
+        });
+    } catch (error) {
+        console.error('Error denying candidate:', error);
+        res.status(500).json({
+            message: 'Failed to deny candidate',
+            data: null,
+            isSuccess: false,
+        });
+    }
+};
+
 module.exports = {
     getJobStatus,
     updateJobStatus,
     createJobStatus,
     getJobStatusByAuthor,
+    hireCandidate,
+    denyCandidate,
 };
+
