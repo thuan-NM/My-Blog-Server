@@ -97,7 +97,7 @@ const updateUser = async (req, res) => {
         },
       }
     )
-    const userdata= {
+    const userdata = {
       email,
       firstName,
       lastName,
@@ -106,7 +106,7 @@ const updateUser = async (req, res) => {
     }
     await db.posts.updateMany(
       { 'author._id': new ObjectId(id) },
-      {$set: {'author.userdata': userdata}})
+      { $set: { 'author.userdata': userdata } })
     res.status(200).json({
       message: "Update user by id successful",
       data: { ...req.body, id: id },
@@ -140,7 +140,7 @@ const acceptFriendRequest = async (req, res) => {
       return res.status(404).json({ message: 'Friend not found', isSuccess: 0 });
     }
 
-    if ( acceptRequest == true) {
+    if (acceptRequest == true) {
       const user1WithoutFriend = { ...user1, friend: null };
       const user2WithoutFriend = { ...user2, friend: null };
       delete user1WithoutFriend.friend
@@ -247,8 +247,8 @@ const searchUsers = async (req, res) => {
       $or: [
         { username: { $regex: query, $options: "i" } },
         { email: { $regex: query, $options: "i" } },
-        { firstName: { $regex: query, $options: "i" }},
-        { lastName: { $regex: query, $options: "i" }}
+        { firstName: { $regex: query, $options: "i" } },
+        { lastName: { $regex: query, $options: "i" } }
       ],
     }).toArray();
 
@@ -269,7 +269,7 @@ const searchUsers = async (req, res) => {
 
 
 
-const updatePictures=async (req, res) => {
+const updatePictures = async (req, res) => {
   console.log(req)
   try {
     // Kiểm tra xem có file được tải lên hay không
@@ -299,7 +299,7 @@ const updatePictures=async (req, res) => {
       { $set: { 'author.userdata.profilePictureUrl': profilePictureUrl } }
     );
     await db.comments.updateMany(
-      { 'author._id':req.params.id },
+      { 'author._id': req.params.id },
       { $set: { 'author.profilePictureUrl': profilePictureUrl } }
     );
 
@@ -311,6 +311,34 @@ const updatePictures=async (req, res) => {
 }
 
 
+const updateCoverPicture = async (req, res) => {
+  try {
+    // Kiểm tra xem có file được tải lên hay không
+    if (!req.file) {
+      return res.status(400).json({ error: 'Vui lòng chọn ảnh' });
+    }
+    // Chuyển đổi đối tượng Buffer thành chuỗi base64
+    const imageBuffer = req.file.buffer.toString('base64');
+
+    // Tải ảnh lên Cloudinary vào thư mục cover-pictures
+    const result = await cloudinary.uploader.upload(`data:image/png;base64,${imageBuffer}`, {
+      folder: 'cover-pictures',
+      public_id: `${req.params.id}_${Date.now()}`
+    });
+
+    // Lấy URL của ảnh từ kết quả trả về
+    const coverPictureUrl = result.secure_url;
+
+    // Cập nhật URL của ảnh bìa trong cơ sở dữ liệu
+    await db.users.updateOne({ _id: new ObjectId(req.params.id) }, { $set: { coverPictureUrl } });
+
+    res.json({ message: 'Successfully', coverPictureUrl });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Error' });
+  }
+};
+
 module.exports = {
   getUsers,
   getUserById,
@@ -320,4 +348,6 @@ module.exports = {
   searchUsers,
   removeFriend,
   updatePictures,
+  updateCoverPicture, // Thêm hàm mới vào exports
 };
+

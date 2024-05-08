@@ -290,7 +290,6 @@ const deleteJobStatus = async (req, res) => {
 };
 const checkUserApplied = async (req, res) => {
     const { postid, userid } = req.query;
-
     if (!ObjectId.isValid(postid) || !ObjectId.isValid(userid)) {
         return res.status(400).json({
             message: 'Invalid post ID or user ID format',

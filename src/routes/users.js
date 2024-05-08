@@ -31,4 +31,7 @@ usersRouter.put('/:id/remove-friend', verifyAuth, userController.removeFriend);
 
 usersRouter.post('/update-picture/:id', verifyAuth, upload.single('profilePicture'), userController.updatePictures);
 
+usersRouter.post('/update-cover-picture/:id', verifyAuth, upload.single('coverPicture'), userController.updateCoverPicture);
+
+
 module.exports = usersRouter;
