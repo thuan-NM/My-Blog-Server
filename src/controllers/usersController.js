@@ -5,24 +5,14 @@ const { db } = require("../utils/connectDb");
 
 const getUsers = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const pageSize = parseInt(req.query.pageSize) || 5;
-    const skip = (page - 1) * pageSize;
-
-    const [users, totalCount] = await Promise.all([
-      db.users.find().skip(skip).limit(pageSize).toArray(),
+    const [users] = await Promise.all([
+      db.users.find().toArray(),
       db.users.countDocuments(),
     ]);
-
-    const totalPages = Math.ceil(totalCount / pageSize);
 
     res.status(200).json({
       message: "Get users list successful",
       data: users,
-      page,
-      pageSize,
-      totalPages,
-      totalCount,
       isSuccess: true,
     });
   } catch (error) {

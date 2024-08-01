@@ -19,7 +19,7 @@ wss.on("connection", async (ws, req) => {
                     broadcastMessage(message, ws);
                 });
             } else {
-                if (userId === parsedMessage.sender) {
+                if (userId === parsedMessage.sender || userId === parsedMessage.receiver) {
                     const savedMessage = await saveMessageToDB(parsedMessage);
                     broadcastMessage(savedMessage, ws);
                 } else {
@@ -70,7 +70,7 @@ const broadcastMessage = async (message, sender) => {
                     receiver: message.receiver,
                     timestamp: new Date(),
                     _id: message._id,
-                })); 
+                })); client.
                 break;
             }
         }
