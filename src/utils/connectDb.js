@@ -1,7 +1,7 @@
 const { MongoClient } = require("mongodb");
 
 const db = {};
-const MONGODB_URL = "mongodb://127.0.0.1:27017";
+const MONGODB_URL = "mongodb+srv://nguyenminhthuan2003st:112233zZ%40@cluster0.iblshhh.mongodb.net/";
 const DATABASE = "my-blog";
 
 async function connectDb() {
