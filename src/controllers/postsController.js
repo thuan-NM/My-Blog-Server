@@ -29,59 +29,59 @@ const getFilterPost = async (req, res) => {
     const lowercaseSkills = filter.skills.map(skill => skill.toUpperCase());
     // Xây dựng điều kiện lọc dựa trên yêu cầu của bạn
     const query = {};
-    if (lowercaseSkills.length > 0 && lowercaseSkills[0]!=="") {
+    if (lowercaseSkills.length > 0 && lowercaseSkills[0] !== "") {
       query.skills = { $in: lowercaseSkills };
-  }
-    if (!isNaN(filter.minInputValue) && !isNaN(filter.maxInputValue) && (filter.minInputValue !== null)&& (filter.maxInputValue !== null)) {
-        // Chuyển đổi giá trị minInputValue và maxInputValue sang số
-        const minPrice = parseFloat(filter.minInputValue);
-        const maxPrice = parseFloat(filter.maxInputValue);
-        // Kiểm tra xem giá trị đã chuyển đổi có phải là số không
-        if (!isNaN(minPrice) && !isNaN(maxPrice)) {
-            query.price = {
-                $gte: minPrice,
-                $lte: maxPrice
-            };
-        }
+    }
+    if (!isNaN(filter.minInputValue) && !isNaN(filter.maxInputValue) && (filter.minInputValue !== null) && (filter.maxInputValue !== null)) {
+      // Chuyển đổi giá trị minInputValue và maxInputValue sang số
+      const minPrice = parseFloat(filter.minInputValue);
+      const maxPrice = parseFloat(filter.maxInputValue);
+      // Kiểm tra xem giá trị đã chuyển đổi có phải là số không
+      if (!isNaN(minPrice) && !isNaN(maxPrice)) {
+        query.price = {
+          $gte: minPrice,
+          $lte: maxPrice
+        };
+      }
     }
     if (filter.country && filter.country !== "") {
-        // Xử lý chuyển đổi "country" sang lowercase
-        query.country = filter.country.toUpperCase();
+      // Xử lý chuyển đổi "country" sang lowercase
+      query.country = filter.country.toUpperCase();
     }
 
     if (filter.typeOfJob && filter.typeOfJob !== "") {
       // Xử lý chuyển đổi "country" sang lowercase
       query.typeOfJob = filter.typeOfJob.toUpperCase();
-    } 
-    
+    }
+
     if (filter.workType && filter.workType !== "") {
       // Xử lý chuyển đổi "country" sang lowercase
       query.workType = filter.workType.toUpperCase();
-    } 
+    }
     if (filter.experience && filter.experience !== "") {
       // Xử lý chuyển đổi "country" sang lowercase
       query.experience = filter.experience;
-    } 
+    }
 
     // Lấy danh sách bài viết dựa trên điều kiện lọc và số lượng bài viết
     const [posts, totalCount] = await Promise.all([
-        db.posts.find(query).sort({ createdAt: -1 }).toArray(),
-        db.posts.countDocuments(query)
+      db.posts.find(query).sort({ createdAt: -1 }).toArray(),
+      db.posts.countDocuments(query)
     ]);
     // Trả về kết quả cho front end
     res.status(200).json({
-        message: "Get post list successful",
-        data: posts,
-        totalCount: totalCount,
-        isSuccess: true
+      message: "Get post list successful",
+      data: posts,
+      totalCount: totalCount,
+      isSuccess: true
     });
-} catch (error) {
+  } catch (error) {
     res.status(500).json({
-        message: error.message,
-        data: null,
-        isSuccess: false
+      message: error.message,
+      data: null,
+      isSuccess: false
     });
-}
+  }
 }
 
 // GET post by id
@@ -123,10 +123,12 @@ const getPostByUserId = async (req, res) => {
     const [posts, totalCount] = await Promise.all([
       db.posts.find({
         "author._id": new ObjectId(userid),
-      }).toArray(),
-      db.posts.countDocuments(db.posts.find({ "author._id": new ObjectId(userid), })),
+      }).skip(skip).limit(pageSize).toArray(),
+      db.posts.countDocuments({ "author._id": new ObjectId(userid) }),
     ]);
+
     const totalPages = Math.ceil(totalCount / pageSize);
+
     res.status(200).json({
       message: "Get post list successful",
       data: posts,
@@ -144,6 +146,7 @@ const getPostByUserId = async (req, res) => {
     });
   }
 };
+
 
 // CREATE new post
 const createPost = async (req, res) => {
@@ -191,8 +194,8 @@ const createPost = async (req, res) => {
     const UppercaseSkills = skills.map(skill => skill.toUpperCase());
     // Create the post object with the required information
     const post = {
-      title:title.toUpperCase(),
-      description:description.toUpperCase(),
+      title: title.toUpperCase(),
+      description: description.toUpperCase(),
       createdAt: new Date(),
       author: {
         _id: new ObjectId(userId),
