@@ -1,14 +1,16 @@
-const { ObjectId } = require("mongodb");
-
-const { db } = require("../utils/connectDb");
-
+const mongoose = require('mongoose');
+const Post = require('../models/Post');
+const Comment = require('../models/Comment');
+const Reaction = require('../models/Reaction');
+const User = require('../models/User')
 // GET posts
 const getPosts = async (req, res) => {
   try {
     const [posts, totalCount] = await Promise.all([
-      db.posts.find({}).sort({ createdAt: -1 }).toArray(),
-      db.posts.countDocuments({}),
+      Post.find({}).sort({ createdAt: -1 }),
+      Post.countDocuments({}),
     ]);
+
     res.status(200).json({
       message: "Get post list successful",
       data: posts,
@@ -23,52 +25,41 @@ const getPosts = async (req, res) => {
     });
   }
 };
+
+// GET filtered posts
 const getFilterPost = async (req, res) => {
   try {
     const filter = req.body;
     const lowercaseSkills = filter.skills.map(skill => skill.toUpperCase());
-    // Xây dựng điều kiện lọc dựa trên yêu cầu của bạn
     const query = {};
+
     if (lowercaseSkills.length > 0 && lowercaseSkills[0] !== "") {
       query.skills = { $in: lowercaseSkills };
     }
-    if (!isNaN(filter.minInputValue) && !isNaN(filter.maxInputValue) && (filter.minInputValue !== null) && (filter.maxInputValue !== null)) {
-      // Chuyển đổi giá trị minInputValue và maxInputValue sang số
-      const minPrice = parseFloat(filter.minInputValue);
-      const maxPrice = parseFloat(filter.maxInputValue);
-      // Kiểm tra xem giá trị đã chuyển đổi có phải là số không
-      if (!isNaN(minPrice) && !isNaN(maxPrice)) {
-        query.price = {
-          $gte: minPrice,
-          $lte: maxPrice
-        };
-      }
+    if (!isNaN(filter.minInputValue) && !isNaN(filter.maxInputValue) && filter.minInputValue !== null && filter.maxInputValue !== null) {
+      query.price = {
+        $gte: parseFloat(filter.minInputValue),
+        $lte: parseFloat(filter.maxInputValue)
+      };
     }
     if (filter.country && filter.country !== "") {
-      // Xử lý chuyển đổi "country" sang lowercase
       query.country = filter.country.toUpperCase();
     }
-
     if (filter.typeOfJob && filter.typeOfJob !== "") {
-      // Xử lý chuyển đổi "country" sang lowercase
       query.typeOfJob = filter.typeOfJob.toUpperCase();
     }
-
     if (filter.workType && filter.workType !== "") {
-      // Xử lý chuyển đổi "country" sang lowercase
       query.workType = filter.workType.toUpperCase();
     }
     if (filter.experience && filter.experience !== "") {
-      // Xử lý chuyển đổi "country" sang lowercase
       query.experience = filter.experience;
     }
 
-    // Lấy danh sách bài viết dựa trên điều kiện lọc và số lượng bài viết
     const [posts, totalCount] = await Promise.all([
-      db.posts.find(query).sort({ createdAt: -1 }).toArray(),
-      db.posts.countDocuments(query)
+      Post.find(query).sort({ createdAt: -1 }),
+      Post.countDocuments(query)
     ]);
-    // Trả về kết quả cho front end
+
     res.status(200).json({
       message: "Get post list successful",
       data: posts,
@@ -88,9 +79,8 @@ const getFilterPost = async (req, res) => {
 const getPostById = async (req, res) => {
   try {
     const id = req.params.id;
-    const post = await db.posts.findOne({
-      _id: new ObjectId(id),
-    });
+    const post = await Post.findById(id);
+
     res.status(200).json({
       message: "Get post detail by id successful",
       data: post,
@@ -105,15 +95,15 @@ const getPostById = async (req, res) => {
   }
 };
 
+// GET posts by user id with pagination
 const getPostByUserId = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 5;
     const skip = (page - 1) * pageSize;
-    const userid = req.params.id;
+    const userId = req.params.id;
 
-    // Kiểm tra xem userid có tồn tại không
-    if (!userid) {
+    if (!userId) {
       return res.status(400).json({
         message: "User ID is required",
         isSuccess: false,
@@ -121,10 +111,8 @@ const getPostByUserId = async (req, res) => {
     }
 
     const [posts, totalCount] = await Promise.all([
-      db.posts.find({
-        "author._id": new ObjectId(userid),
-      }).skip(skip).limit(pageSize).toArray(),
-      db.posts.countDocuments({ "author._id": new ObjectId(userid) }),
+      Post.find({ "author._id": userId }).skip(skip).limit(pageSize),
+      Post.countDocuments({ "author._id": userId }),
     ]);
 
     const totalPages = Math.ceil(totalCount / pageSize);
@@ -147,70 +135,37 @@ const getPostByUserId = async (req, res) => {
   }
 };
 
-
 // CREATE new post
 const createPost = async (req, res) => {
   try {
     const { title, description, skills, typeOfJob, price, experience, workType } = req.body;
-    if (description === null || !skills || !title || !price || !typeOfJob || !experience || !workType) {
+
+    if (!title || !description || !skills || !price || !typeOfJob || !experience || !workType) {
       return res.status(400).json({
         message: "All fields are required",
-        isSuccess: 0,
+        isSuccess: false,
       });
     }
 
-    // Get the user ID from the request (you might need to modify this based on your authentication mechanism)
     const userId = req.body.user._id;
-
-    // Extend the pipeline to get the user's information
-    const pipeline = [
-      {
-        $match: {
-          _id: new ObjectId(userId),
-        },
-      },
-      {
-        $lookup: {
-          from: 'users', // The name of the collection to perform the lookup
-          localField: '_id',
-          foreignField: '_id',
-          as: 'user_info',
-        },
-      },
-      {
-        $unwind: '$user_info',
-      },
-      {
-        $project: {
-          'user_info.password': 0,
-          'user_info.friend': 0,
-          'user_info.friendRequests': 0,
-          'user_info.username': 0,// Exclude sensitive information if needed
-        },
-      },
-    ];
-
-    const [user] = await db.users.aggregate(pipeline).toArray();
+    const user = await User.findById(userId).select('-password -friend -friendRequests -username');
     const UppercaseSkills = skills.map(skill => skill.toUpperCase());
-    // Create the post object with the required information
-    const post = {
+
+    const post = new Post({
       title: title.toUpperCase(),
       description: description.toUpperCase(),
-      createdAt: new Date(),
       author: {
-        _id: new ObjectId(userId),
-        userdata: user.user_info,
-        // Add other user information as needed
+        _id: userId,
+        userdata: user
       },
       skills: UppercaseSkills,
       typeOfJob: typeOfJob.toUpperCase(),
       price: parseFloat(price),
       experience: experience.toUpperCase(),
       workType: workType.toUpperCase(),
-    };
+    });
 
-    // Insert the post into the "posts" collection
-    await db.posts.insertOne(post);
+    await post.save();
 
     res.status(201).json({
       message: "Create a post successfully",
@@ -232,22 +187,16 @@ const updatePost = async (req, res) => {
   const { title, content, author, hashtags } = req.body;
   try {
     const id = req.params.id;
-    await db.posts.updateOne(
-      {
-        _id: new ObjectId(id),
-      },
-      {
-        $set: {
-          title: title,
-          content: content,
-          author: author,
-          hashtags: hashtags,
-        },
-      }
-    );
+    const post = await Post.findByIdAndUpdate(id, {
+      title,
+      content,
+      author,
+      hashtags,
+    }, { new: true });
+
     res.status(200).json({
       message: "Update post by id successful",
-      data: { ...req.body, id: id },
+      data: post,
       isSuccess: true,
     });
   } catch (error) {
@@ -263,9 +212,8 @@ const updatePost = async (req, res) => {
 const deletePost = async (req, res) => {
   try {
     const id = req.params.id;
-    await db.posts.deleteOne({
-      _id: new ObjectId(id),
-    });
+    await Post.findByIdAndDelete(id);
+
     res.status(200).json({
       message: "Delete post by id successful",
       data: { id },
@@ -280,46 +228,45 @@ const deletePost = async (req, res) => {
   }
 };
 
+// SEARCH posts
 const searchPosts = async (req, res) => {
   try {
     const query = req.query.searchTerm;
-    const searchResults = await db.posts.find({
+    const searchResults = await Post.find({
       $or: [
         { content: { $regex: query, $options: "i" } },
         { title: { $regex: query, $options: "i" } },
         { hashtags: { $regex: query, $options: "i" } },
-        { author: { $regex: query, $options: "i" } },
+        { "author.userdata.username": { $regex: query, $options: "i" } },
       ],
-    }).toArray();
+    });
 
     res.status(200).json({
-      message: "Search users successful",
+      message: "Search posts successful",
       data: searchResults,
       isSuccess: true,
     });
   } catch (error) {
-    console.error('Error searching users:', error);
+    console.error('Error searching posts:', error);
     res.status(500).json({
-      message: 'Failed to search users',
+      message: 'Failed to search posts',
       data: null,
       isSuccess: false,
     });
   }
 };
 
+// GET top posts by reactions
 const getTopPosts = async (req, res) => {
   try {
-    // Get the top 10 post IDs with the highest number of reactions
-    const topPostIds = await db.reactions.aggregate([
+    const topPostIds = await Reaction.aggregate([
       { $group: { _id: "$postId", totalReactions: { $sum: 1 } } },
       { $sort: { totalReactions: -1 } },
       { $limit: 5 },
-    ]).toArray();
-    // Extract post IDs from topPostIds
-    const topPostIdsArray = topPostIds.map((item) => item._id);
+    ]).exec();
 
-    // Find posts based on the top post IDs
-    const topPosts = await db.posts.find({ _id: { $in: topPostIdsArray } }).toArray();
+    const topPostIdsArray = topPostIds.map((item) => item._id);
+    const topPosts = await Post.find({ _id: { $in: topPostIdsArray } });
 
     res.status(200).json({
       message: "Get top posts successful",
@@ -336,29 +283,27 @@ const getTopPosts = async (req, res) => {
   }
 };
 
+// GET most commented posts
 const getMostInterestPosts = async (req, res) => {
   try {
-    // Get the top 10 post IDs with the highest number of reactions
-    const topPostIds = await db.comments.aggregate([
-      { $group: { _id: "$postId", totalReactions: { $sum: 1 } } },
+    const topPostIds = await Comment.aggregate([
+      { $group: { _id: "$postId", totalComments: { $sum: 1 } } },
       { $sort: { totalComments: -1 } },
       { $limit: 5 },
-    ]).toArray();
-    // Extract post IDs from topPostIds
-    const topPostIdsArray = topPostIds.map((item) => item._id);
+    ]).exec();
 
-    // Find posts based on the top post IDs
-    const topPosts = await db.posts.find({ _id: { $in: topPostIdsArray } }).toArray();
+    const topPostIdsArray = topPostIds.map((item) => item._id);
+    const topPosts = await Post.find({ _id: { $in: topPostIdsArray } });
 
     res.status(200).json({
-      message: "Get top posts successful",
+      message: "Get most commented posts successful",
       data: topPosts,
       isSuccess: true,
     });
   } catch (error) {
-    console.error('Error getting top posts:', error);
+    console.error('Error getting most commented posts:', error);
     res.status(500).json({
-      message: 'Failed to get top posts',
+      message: 'Failed to get most commented posts',
       data: null,
       isSuccess: false,
     });

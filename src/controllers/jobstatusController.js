@@ -1,21 +1,20 @@
-const { ObjectId } = require("mongodb");
-const { db } = require("../utils/connectDb");
+const mongoose = require('mongoose');
+const JobStatus = require('../models/JobStatus'); // Your Mongoose model for JobStatus
+const Post = require('../models/Post'); // Your Mongoose model for Post
+const User = require('../models/User'); // Your Mongoose model for User
 
 const getJobStatus = async (req, res) => {
     try {
         const { postid, userid } = req.body;
-        if (!ObjectId.isValid(postid) || !ObjectId.isValid(userid)) {
+        if (!mongoose.Types.ObjectId.isValid(postid) || !mongoose.Types.ObjectId.isValid(userid)) {
             return res.status(400).json({
                 message: 'Invalid post ID or user ID format',
                 data: null,
                 isSuccess: false,
             });
         }
-        const jobstatus = await db.jobstatus.find({
-            postid: new ObjectId(postid),
-            userid: new ObjectId(userid),
-        }).toArray();
-        if (!jobstatus) {
+        const jobStatus = await JobStatus.find({ postid, userid });
+        if (!jobStatus) {
             return res.status(404).json({
                 message: 'Job status not found',
                 data: null,
@@ -24,7 +23,7 @@ const getJobStatus = async (req, res) => {
         }
         return res.status(200).json({
             message: 'Get job status successful',
-            data: jobstatus,
+            data: jobStatus,
             isSuccess: true,
         });
     } catch (error) {
@@ -36,29 +35,33 @@ const getJobStatus = async (req, res) => {
         });
     }
 };
+
 const updateJobStatus = async (req, res) => {
     const { status, candidateInfo } = req.body;
     try {
         const id = req.params.id;
-        if (!ObjectId.isValid(id)) {
+        if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({
                 message: 'Invalid job status ID format',
                 data: null,
                 isSuccess: false,
             });
         }
-        await db.jobStatus.updateOne(
-            { _id: new ObjectId(id) },
-            {
-                $set: {
-                    status,
-                    candidateInfo,
-                },
-            }
-        )
+        const updatedJobStatus = await JobStatus.findByIdAndUpdate(
+            id,
+            { $set: { status, candidateInfo } },
+            { new: true } // Return the updated document
+        );
+        if (!updatedJobStatus) {
+            return res.status(404).json({
+                message: 'Job status not found',
+                data: null,
+                isSuccess: false,
+            });
+        }
         res.status(200).json({
-            message: "Update job status by id successful",
-            data: { ...req.body, id: id },
+            message: "Update job status by ID successful",
+            data: updatedJobStatus,
             isSuccess: true,
         });
     } catch (error) {
@@ -70,13 +73,13 @@ const updateJobStatus = async (req, res) => {
         });
     }
 };
+
 const createJobStatus = async (req, res) => {
     const { postid, userid, status, candidateInfo } = req.body;
-    console.log(candidateInfo);
     try {
-        const existingJobStatus = await db.jobstatus.findOne({
-            postid: new ObjectId(postid),
-            userid: new ObjectId(userid),
+        const existingJobStatus = await JobStatus.findOne({
+            postid,
+            userid,
         });
         if (existingJobStatus && existingJobStatus.status !== 'Denied') {
             return res.status(400).json({
@@ -85,22 +88,18 @@ const createJobStatus = async (req, res) => {
                 isSuccess: false,
             });
         }
-        const newJobStatus = {
-            postid: new ObjectId(postid),
-            userid: new ObjectId(userid),
+        const newJobStatus = new JobStatus({
+            postid,
+            userid,
             status,
             candidateInfo,
-        };
-        const result = await db.jobstatus.insertOne(newJobStatus);
-        if (result.acknowledged) {
-            res.status(201).json({
-                message: "Create job status successful",
-                data: { ...req.body, _id: result.insertedId },
-                isSuccess: true,
-            });
-        } else {
-            throw new Error('Insert operation not acknowledged');
-        }
+        });
+        const savedJobStatus = await newJobStatus.save();
+        res.status(201).json({
+            message: "Create job status successful",
+            data: savedJobStatus,
+            isSuccess: true,
+        });
     } catch (error) {
         console.error('Error creating job status:', error);
         res.status(500).json({
@@ -110,40 +109,37 @@ const createJobStatus = async (req, res) => {
         });
     }
 };
+
 const getJobStatusByAuthor = async (req, res) => {
     try {
-        const authorid = req.params;
-        if (!ObjectId.isValid(authorid)) {
+        const authorid = req.params.id;
+        if (!mongoose.Types.ObjectId.isValid(authorid)) {
             return res.status(400).json({
                 message: 'Invalid user ID format',
                 data: null,
                 isSuccess: false,
             });
         }
-        const posts = await db.posts.find({
-            "author._id": new ObjectId(authorid),
-        }).toArray();
+        const posts = await Post.find({ "author._id": authorid });
         for (let post of posts) {
-            const jobStatusCount = await db.jobstatus.countDocuments({
-                postid: new ObjectId(post._id),
+            const jobStatusCount = await JobStatus.countDocuments({
+                postid: post._id,
                 status: "Applied"
             });
-            const jobStatusItem = await db.jobstatus.find({
-                postid: new ObjectId(post._id),
+            const jobStatusItems = await JobStatus.find({
+                postid: post._id,
                 status: "Applied"
-            }).toArray();
+            });
             post.jobStatusCount = jobStatusCount;
             post.userapply = [];
-            for (let job of jobStatusItem) {
-                const user = await db.users.findOne({
-                    _id: new ObjectId(job.userid),
-                });
+            for (let job of jobStatusItems) {
+                const user = await User.findById(job.userid);
                 const data = {
-                    user: user,
+                    user,
                     info: job.candidateInfo,
                     status: job.status,
-                }
-                post.userapply = [...post.userapply, data];
+                };
+                post.userapply.push(data);
             }
         }
         return res.status(200).json({
@@ -160,12 +156,11 @@ const getJobStatusByAuthor = async (req, res) => {
         });
     }
 };
+
 const hireCandidate = async (req, res) => {
     const { postid } = req.body;
-    const userid = req.params.id
-    console.log(postid)
-    console.log(userid)
-    if (!ObjectId.isValid(userid) || !ObjectId.isValid(postid)) {
+    const userid = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(userid) || !mongoose.Types.ObjectId.isValid(postid)) {
         return res.status(400).json({
             message: 'Invalid user ID or post ID format',
             data: null,
@@ -173,28 +168,36 @@ const hireCandidate = async (req, res) => {
         });
     }
     try {
-        await db.jobstatus.updateOne(
-            { userid: new ObjectId(userid), postid: new ObjectId(postid) },
-            { $set: { status: 'Hired' } },
+        const result = await JobStatus.updateOne(
+            { userid, postid },
+            { $set: { status: 'Hired' } }
         );
+        if (result.nModified === 0) {
+            return res.status(404).json({
+                message: 'Job status not found',
+                data: null,
+                isSuccess: false,
+            });
+        }
         return res.status(200).json({
-            message: 'Tuyển thành công',
+            message: 'Candidate hired successfully',
             data: null,
             isSuccess: true,
         });
     } catch (error) {
         console.error('Error hiring candidate:', error);
         res.status(500).json({
-            message: 'Tuyển không thành công',
+            message: 'Failed to hire candidate',
             data: null,
             isSuccess: false,
         });
     }
 };
+
 const denyCandidate = async (req, res) => {
     const { postid } = req.body;
-    const userid = req.params.id
-    if (!ObjectId.isValid(userid) || !ObjectId.isValid(postid)) {
+    const userid = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(userid) || !mongoose.Types.ObjectId.isValid(postid)) {
         return res.status(400).json({
             message: 'Invalid user ID or post ID format',
             data: null,
@@ -202,12 +205,19 @@ const denyCandidate = async (req, res) => {
         });
     }
     try {
-        await db.jobstatus.updateOne(
-            { userid: new ObjectId(userid), postid: new ObjectId(postid) },
+        const result = await JobStatus.updateOne(
+            { userid, postid },
             { $set: { status: 'Denied' } }
         );
+        if (result.nModified === 0) {
+            return res.status(404).json({
+                message: 'Job status not found',
+                data: null,
+                isSuccess: false,
+            });
+        }
         return res.status(200).json({
-            message: 'Candidate has been denied successfully',
+            message: 'Candidate denied successfully',
             data: null,
             isSuccess: true,
         });
@@ -220,31 +230,29 @@ const denyCandidate = async (req, res) => {
         });
     }
 };
+
 const getUserAppliedPosts = async (req, res) => {
     try {
         const { userId, statusdata } = req.query;
-        if (!ObjectId.isValid(userId)) {
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({
                 message: 'Invalid user ID format',
                 data: null,
                 isSuccess: false,
             });
         }
-        const jobStatuses = await db.jobstatus.find({
-            userid: new ObjectId(userId),
+        const jobStatuses = await JobStatus.find({
+            userid: userId,
             status: statusdata
-        }).toArray();
-        let posts = [];
+        });
+        const posts = [];
         for (let jobStatus of jobStatuses) {
-            const post = await db.posts.findOne({
-                _id: new ObjectId(jobStatus.postid),
-            });
+            const post = await Post.findById(jobStatus.postid);
             if (post) {
                 posts.push(post);
-                post.status = jobStatus
+                post.status = jobStatus;
             }
         }
-        console.log(posts)
         return res.status(200).json({
             message: 'Get user applied posts successful',
             data: posts,
@@ -259,9 +267,10 @@ const getUserAppliedPosts = async (req, res) => {
         });
     }
 };
+
 const deleteJobStatus = async (req, res) => {
     const { id } = req.params;
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({
             message: 'Invalid job status ID format',
             data: null,
@@ -269,16 +278,19 @@ const deleteJobStatus = async (req, res) => {
         });
     }
     try {
-        const result = await db.jobstatus.deleteOne({ _id: new ObjectId(id) });
-        if (result.deletedCount === 1) {
-            res.status(200).json({
-                message: 'Delete job status successful',
+        const result = await JobStatus.findByIdAndDelete(id);
+        if (!result) {
+            return res.status(404).json({
+                message: 'Job status not found',
                 data: null,
-                isSuccess: true,
+                isSuccess: false,
             });
-        } else {
-            throw new Error('Job status not found');
         }
+        return res.status(200).json({
+            message: 'Delete job status successful',
+            data: null,
+            isSuccess: true,
+        });
     } catch (error) {
         console.error('Error deleting job status:', error);
         res.status(500).json({
@@ -288,9 +300,10 @@ const deleteJobStatus = async (req, res) => {
         });
     }
 };
+
 const checkUserApplied = async (req, res) => {
     const { postid, userid } = req.query;
-    if (!ObjectId.isValid(postid) || !ObjectId.isValid(userid)) {
+    if (!mongoose.Types.ObjectId.isValid(postid) || !mongoose.Types.ObjectId.isValid(userid)) {
         return res.status(400).json({
             message: 'Invalid post ID or user ID format',
             data: null,
@@ -298,27 +311,19 @@ const checkUserApplied = async (req, res) => {
         });
     }
     try {
-        const jobstatus = await db.jobstatus.findOne({
-            postid: new ObjectId(postid),
-            userid: new ObjectId(userid),
+        const jobStatus = await JobStatus.findOne({
+            postid,
+            userid,
         });
-        if (!jobstatus || jobstatus.status === 'Denied') {
-            return res.status(200).json({
-                message: 'User has not applied or was denied',
-                data: null,
-                isSuccess: true,
-            });
-        } else {
-            return res.status(200).json({
-                message: 'User has already applied',
-                data: jobstatus,
-                isSuccess: true,
-            });
-        }
+        return res.status(200).json({
+            message: 'User application status fetched',
+            data: jobStatus || 'User has not applied or was denied',
+            isSuccess: true,
+        });
     } catch (error) {
-        console.error('Error checking user application:', error);
+        console.error('Error checking user application status:', error);
         res.status(500).json({
-            message: 'Failed to check user application',
+            message: 'Failed to check user application status',
             data: null,
             isSuccess: false,
         });
@@ -334,6 +339,5 @@ module.exports = {
     denyCandidate,
     getUserAppliedPosts,
     deleteJobStatus,
-    checkUserApplied
+    checkUserApplied,
 };
-

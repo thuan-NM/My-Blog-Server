@@ -15,7 +15,8 @@ const reactsRouter = require("./routes/reacts");
 const overviewsRoute = require("./routes/overviews");
 const experiencesRoute = require("./routes/experiences");
 const educationsRoute = require("./routes/educations");
-const jobstatusRoute = require("./routes/jobstatus")
+const jobstatusRoute = require("./routes/jobstatus");
+const followRouter = require("./routes/follow");
 
 const app = express();
 const port = 3001;
@@ -34,6 +35,7 @@ app.use("/overviews", overviewsRoute);
 app.use("/experiences", experiencesRoute);
 app.use("/educations", educationsRoute);
 app.use("/jobstatus", jobstatusRoute);
+app.use("/follow", followRouter);
 
 const server = http.createServer(app);
 server.listen(port, () => {

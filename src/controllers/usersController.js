@@ -1,14 +1,12 @@
-const { ObjectId } = require("mongodb");
+const mongoose = require("mongoose");
 const cloudinary = require('cloudinary').v2;
-const { db } = require("../utils/connectDb");
-
+const User = require("../models/User");
+const Post = require("../models/Post");
+const Comment = require("../models/Comment");
 
 const getUsers = async (req, res) => {
   try {
-    const [users] = await Promise.all([
-      db.users.find().toArray(),
-      db.users.countDocuments(),
-    ]);
+    const users = await User.find().exec();
 
     res.status(200).json({
       message: "Get users list successful",
@@ -29,8 +27,7 @@ const getUserById = async (req, res) => {
   try {
     const id = req.params.id;
 
-    // Validate that the id is a valid ObjectId
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         message: 'Invalid user ID format',
         data: null,
@@ -38,11 +35,8 @@ const getUserById = async (req, res) => {
       });
     }
 
-    const user = await db.users.findOne({
-      _id: new ObjectId(id),
-    });
+    const user = await User.findById(id).exec();
     if (!user) {
-      // User not found
       return res.status(404).json({
         message: 'User not found',
         data: null,
@@ -50,7 +44,6 @@ const getUserById = async (req, res) => {
       });
     }
 
-    // User found
     return res.status(200).json({
       message: 'Get user detail by ID successful',
       data: user,
@@ -66,40 +59,18 @@ const getUserById = async (req, res) => {
   }
 };
 
-
 const updateUser = async (req, res) => {
-  const { email } = req.body;
-  const firstName = req.body.firstName.trim();
-  const lastName = req.body.lastName.trim();
-  const dob = req.body.dob.trim();
-  const address = req.body.address.trim();
+  const { email, firstName, lastName, dob, address } = req.body;
   try {
     const id = req.params.id;
-    await db.users.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          email,
-          firstName,
-          lastName,
-          dob,
-          address,
-        },
-      }
-    )
-    const userdata = {
-      email,
-      firstName,
-      lastName,
-      dob,
-      address,
-    }
-    await db.posts.updateMany(
-      { 'author._id': new ObjectId(id) },
-      { $set: { 'author.userdata': userdata } })
+    const userdata = { email, firstName: firstName.trim(), lastName: lastName.trim(), dob: dob.trim(), address: address.trim() };
+
+    const user = await User.findByIdAndUpdate(id, { $set: userdata }, { new: true }).exec();
+    await Post.updateMany({ 'author._id': id }, { $set: { 'author.userdata': userdata } });
+
     res.status(200).json({
       message: "Update user by id successful",
-      data: { ...req.body, id: id },
+      data: user,
       isSuccess: true,
     });
   } catch (error) {
@@ -114,47 +85,29 @@ const updateUser = async (req, res) => {
 
 const acceptFriendRequest = async (req, res) => {
   const userId = req.params.id;
-  const friendRequest = req.body.friendRequest;
-  const acceptRequest = req.body.acceptRequest;
+  const { friendRequest, acceptRequest } = req.body;
 
   try {
-    const user1 = await db.users.findOne({ _id: new ObjectId(userId) });
+    const user1 = await User.findById(userId).exec();
+    const user2 = await User.findById(friendRequest._id).exec();
 
-    if (!user1) {
+    if (!user1 || !user2) {
       return res.status(404).json({ message: 'User not found', isSuccess: 0 });
     }
 
-    const user2 = await db.users.findOne({ _id: new ObjectId(friendRequest._id) });
+    if (acceptRequest) {
+      user1.friend.push(user2._id);
+      user2.friend.push(user1._id);
 
-    if (!user2) {
-      return res.status(404).json({ message: 'Friend not found', isSuccess: 0 });
-    }
-
-    if (acceptRequest == true) {
-      const user1WithoutFriend = { ...user1, friend: null };
-      const user2WithoutFriend = { ...user2, friend: null };
-      delete user1WithoutFriend.friend
-      delete user2WithoutFriend.friend
-      user1.friend.push(user2WithoutFriend);
-      user2.friend.push(user1WithoutFriend);
-
-      user1.friendRequests = user1.friendRequests.filter(
-        (request) => request._id.toString() !== friendRequest._id.toString()
-      );
-      user2.friendRequests = user2.friendRequests.filter(
-        (request) => request._id.toString() !== userId.toString()
-      );
+      user1.friendRequests = user1.friendRequests.filter(req => req.toString() !== user2._id.toString());
+      user2.friendRequests = user2.friendRequests.filter(req => req.toString() !== user1._id.toString());
     } else {
-      user1.friendRequests = user1.friendRequests.filter(
-        (request) => request._id.toString() !== friendRequest._id.toString()
-      );
-      user2.friendRequests = user2.friendRequests.filter(
-        (request) => request._id.toString() !== userId.toString()
-      );
+      user1.friendRequests = user1.friendRequests.filter(req => req.toString() !== user2._id.toString());
+      user2.friendRequests = user2.friendRequests.filter(req => req.toString() !== user1._id.toString());
     }
 
-    await db.users.updateOne({ _id: new ObjectId(userId) }, { $set: user1 });
-    await db.users.updateOne({ _id: new ObjectId(friendRequest._id) }, { $set: user2 });
+    await user1.save();
+    await user2.save();
 
     res.json({ message: 'Friend request processed successfully', isSuccess: 1, data: user1 });
   } catch (error) {
@@ -165,26 +118,22 @@ const acceptFriendRequest = async (req, res) => {
 
 const sendFriendRequest = async (req, res) => {
   const userId = req.params.id;
-  const friend = req.body.friend;
+  const { friend } = req.body;
 
   try {
-    const user = await db.users.findOne({ _id: new ObjectId(userId) });
+    const user = await User.findById(userId).exec();
+    const friendUser = await User.findById(friend._id).exec();
 
-    if (friend.friend && friend.friend.some(req => req._id === userId)) {
-      return res.status(400).json({ message: 'Already Friend', isSuccess: 0 });
-    }
-
-    if (!user) {
+    if (!user || !friendUser) {
       return res.status(404).json({ message: 'User not found', isSuccess: 0 });
     }
 
-    if (friend.friendRequests.some(request => request._id === userId)) {
+    if (friendUser.friendRequests.includes(user._id)) {
       return res.status(400).json({ message: 'Friend request already sent', isSuccess: 0 });
     }
 
-    friend.friendRequests.push(user);
-
-    await db.users.updateOne({ _id: new ObjectId(friend._id) }, { $set: { friendRequests: friend.friendRequests } });
+    friendUser.friendRequests.push(user._id);
+    await friendUser.save();
 
     res.json({ message: 'Friend request sent successfully', isSuccess: 1 });
   } catch (error) {
@@ -195,33 +144,21 @@ const sendFriendRequest = async (req, res) => {
 
 const removeFriend = async (req, res) => {
   const userId = req.params.id;
-  const friendId = req.body.friendId;
+  const { friendId } = req.body;
 
   try {
-    const user = await db.users.findOne({ _id: new ObjectId(userId) });
+    const user = await User.findById(userId).exec();
+    const friendToRemove = await User.findById(friendId).exec();
 
-    if (!user) {
+    if (!user || !friendToRemove) {
       return res.status(404).json({ message: 'User not found', isSuccess: 0 });
     }
 
-    const friendToRemove = await db.users.findOne({ _id: new ObjectId(friendId) });
+    user.friend = user.friend.filter(friend => friend.toString() !== friendId.toString());
+    friendToRemove.friend = friendToRemove.friend.filter(friend => friend.toString() !== userId.toString());
 
-    if (!friendToRemove) {
-      return res.status(404).json({ message: 'Friend not found', isSuccess: 0 });
-    }
-
-    // Lọc ra danh sách bạn bè mới mà không bao gồm người bạn cần xóa
-    user.friend = user.friend.filter(
-      (friend) => friend._id.toString() !== friendId.toString()
-    );
-
-    friendToRemove.friend = friendToRemove.friend.filter(
-      (friend) => friend._id.toString() !== userId.toString()
-    );
-
-    // Cập nhật lại thông tin người dùng và người bạn trong cơ sở dữ liệu
-    await db.users.updateOne({ _id: new ObjectId(userId) }, { $set: user });
-    await db.users.updateOne({ _id: new ObjectId(friendId) }, { $set: friendToRemove });
+    await user.save();
+    await friendToRemove.save();
 
     res.json({ message: 'Friend removed successfully', isSuccess: 1, data: user });
   } catch (error) {
@@ -233,14 +170,14 @@ const removeFriend = async (req, res) => {
 const searchUsers = async (req, res) => {
   try {
     const query = req.query.searchTerm;
-    const searchResults = await db.users.find({
+    const searchResults = await User.find({
       $or: [
         { username: { $regex: query, $options: "i" } },
         { email: { $regex: query, $options: "i" } },
         { firstName: { $regex: query, $options: "i" } },
         { lastName: { $regex: query, $options: "i" } }
       ],
-    }).toArray();
+    }).exec();
 
     res.status(200).json({
       message: "Search users successful",
@@ -257,70 +194,48 @@ const searchUsers = async (req, res) => {
   }
 };
 
-
-
 const updatePictures = async (req, res) => {
-  console.log(req)
   try {
-    // Kiểm tra xem có file được tải lên hay không
     if (!req.file) {
       return res.status(400).json({ error: 'Vui lòng chọn ảnh' });
     }
 
-    // Chuyển đổi đối tượng Buffer thành chuỗi base64
     const imageBuffer = req.file.buffer.toString('base64');
 
-    // Tải ảnh lên Cloudinary vào thư mục profile-pictures
     const result = await cloudinary.uploader.upload(`data:image/png;base64,${imageBuffer}`, {
       folder: 'profile-pictures',
       public_id: `${req.params.id}_${Date.now()}`
     });
 
-    // Lấy URL của ảnh từ kết quả trả về
     const profilePictureUrl = result.secure_url;
-    console.log(req.params.id)
-    await db.users.updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { profilePictureUrl } }
-    );
 
-    await db.posts.updateMany(
-      { 'author._id': new ObjectId(req.params.id) },
-      { $set: { 'author.userdata.profilePictureUrl': profilePictureUrl } }
-    );
-    await db.comments.updateMany(
-      { 'author._id': req.params.id },
-      { $set: { 'author.profilePictureUrl': profilePictureUrl } }
-    );
+    await User.findByIdAndUpdate(req.params.id, { profilePictureUrl });
+    await Post.updateMany({ 'author._id': req.params.id }, { 'author.userdata.profilePictureUrl': profilePictureUrl });
+    await Comment.updateMany({ 'author._id': req.params.id }, { 'author.profilePictureUrl': profilePictureUrl });
 
     res.json({ message: 'Successfully', profilePictureUrl });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Error' });
   }
-}
-
+};
 
 const updateCoverPicture = async (req, res) => {
   try {
-    // Kiểm tra xem có file được tải lên hay không
     if (!req.file) {
       return res.status(400).json({ error: 'Vui lòng chọn ảnh' });
     }
-    // Chuyển đổi đối tượng Buffer thành chuỗi base64
+
     const imageBuffer = req.file.buffer.toString('base64');
 
-    // Tải ảnh lên Cloudinary vào thư mục cover-pictures
     const result = await cloudinary.uploader.upload(`data:image/png;base64,${imageBuffer}`, {
       folder: 'cover-pictures',
       public_id: `${req.params.id}_${Date.now()}`
     });
 
-    // Lấy URL của ảnh từ kết quả trả về
     const coverPictureUrl = result.secure_url;
 
-    // Cập nhật URL của ảnh bìa trong cơ sở dữ liệu
-    await db.users.updateOne({ _id: new ObjectId(req.params.id) }, { $set: { coverPictureUrl } });
+    await User.findByIdAndUpdate(req.params.id, { coverPictureUrl });
 
     res.json({ message: 'Successfully', coverPictureUrl });
   } catch (error) {
@@ -338,6 +253,5 @@ module.exports = {
   searchUsers,
   removeFriend,
   updatePictures,
-  updateCoverPicture, // Thêm hàm mới vào exports
+  updateCoverPicture,
 };
-

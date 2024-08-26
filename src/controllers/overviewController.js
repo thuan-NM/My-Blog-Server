@@ -1,69 +1,35 @@
-const { ObjectId } = require("mongodb");
-const { db } = require("../utils/connectDb");
+const Overview  = require("../models/Overview");
+const User = require('../models/User'); // Assuming you have a User model
 
+// CREATE or UPDATE overview by User ID
 const createOverviewByUserId = async (req, res) => {
     try {
-        const userId = req.body.user._id;
+        const { _id: userId } = req.body.user;
         const data = req.body.overviewdata;
 
-        const pipeline = [
-            {
-                $match: {
-                    _id: new ObjectId(userId),
-                },
-            },
-            {
-                $lookup: {
-                    from: 'users', // The name of the collection to perform the lookup
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'user_info',
-                },
-            },
-            {
-                $unwind: '$user_info',
-            },
-            {
-                $project: {
-                    'user_info.password': 0,
-                    'user_info.friend': 0,
-                    'user_info.friendRequests': 0,
-                    'user_info.username': 0,// Exclude sensitive information if needed
-                },
-            },
-        ];
-
-        const [user] = await db.users.aggregate(pipeline).toArray();
-
-        const overview = {
-            data,
-            author: {
-                _id: new ObjectId(userId),
-                userdata: user.user_info,
-                // Add other user information as needed
-            },
+        const user = await User.findById(userId).select("-password -friend -friendRequests -username");
+        if (!user) {
+            return res.status(404).json({ message: "User not found", isSuccess: false });
         }
-        
-        const exist = await db.overviews.findOne({"author._id": new ObjectId(userId)},)
-        if(exist!=null)
-        {
-            await db.overviews.updateOne({
-                _id: new ObjectId(exist._id),
-              },
-              {
-                $set: {
-                    data : data,
-                    author: {
-                        _id: new ObjectId(userId),
-                        userdata: user.user_info,
-                        // Add other user information as needed
-                    },
+
+        let overview = await Overview.findOne({ "author._id": userId });
+
+        if (overview) {
+            overview.data = data;
+            overview.author = {
+                _id: userId,
+                userdata: user,
+            };
+            await overview.save();
+        } else {
+            overview = new Overview({
+                data,
+                author: {
+                    _id: userId,
+                    userdata: user,
                 },
-              })
-        }
-        else
-        {
-            await db.overviews.insertOne(overview);
+            });
+            await overview.save();
         }
 
         res.status(201).json({
@@ -71,35 +37,27 @@ const createOverviewByUserId = async (req, res) => {
             data: overview,
             isSuccess: true,
         });
-    }
-    catch (error) {
-        console.error('Error creating post:', error);
+    } catch (error) {
+        console.error('Error creating or updating overview:', error);
         res.status(500).json({
-            message: 'Failed to create overview',
+            message: 'Failed to create or update overview',
             data: null,
             isSuccess: false,
         });
     }
-
 }
 
+// GET overview by User ID
 const getOverviews = async (req, res) => {
     try {
-        const userid = req.params.id;
-        const overviews = await db.overviews.findOne({"author._id" : new ObjectId(userid),})
-        if(overviews!=null){
+        const { id: userId } = req.params;
+        const overview = await Overview.findOne({ "author._id": userId });
+
         res.status(200).json({
-            message: "Get overviews list successfully",
-            data: overviews,
-            isSuccess: true,
-        });}
-        else{
-            res.status(200).json({
-            message: "Get overviews list successfully",
-            data: "",
+            message: "Get overview successfully",
+            data: overview || "",
             isSuccess: true,
         });
-        }
     } catch (error) {
         res.status(500).json({
             message: error.message,
@@ -109,4 +67,4 @@ const getOverviews = async (req, res) => {
     }
 };
 
-module.exports = {createOverviewByUserId , getOverviews}
+module.exports = { createOverviewByUserId, getOverviews };
