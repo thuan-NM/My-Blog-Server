@@ -22,8 +22,8 @@ const sendVerificationEmail = async (user, token) => {
         to: user.email,
         subject: 'Email Verification',
         html: `<p>Xin chào ${user.username},</p>
-               <p>Vui lòng xác minh email của bạn bằng cách nhấp vào liên kết sau:</p>
-               <a href="http://localhost:3000/auth/verify-email?token=${token}">Xác minh email của tôi</a>`,
+               <p>Để xác minh email của bạn, hãy nhấp vào liên kết sau:</p>
+               <a href="http://localhost:3001/auth/verify-email?token=${token}">Xác minh email của tôi</a>`,
     };
 
     await transporter.sendMail(mailOptions);
