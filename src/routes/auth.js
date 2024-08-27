@@ -12,4 +12,8 @@ authRouter.post("/register", validateRegisterInput ,authController.register);
 
 authRouter.put("/changepassword/:id",verifyAuth ,authController.changePassword);
 
+authRouter.post("/loginwithgoogle", authController.loginWithGoogle);
+
+authRouter.get('/verify-email', authController.verifyEmail);
+
 module.exports = authRouter;

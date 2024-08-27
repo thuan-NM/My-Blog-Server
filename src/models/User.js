@@ -12,7 +12,8 @@ const userSchema = new mongoose.Schema({
   profilePictureUrl: { type: String },
   coverPictureUrl: { type: String },
   friend: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  friendRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+  friendRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  isVerified: { type: Boolean, default: false },
 }, {
   timestamps: true
 });
