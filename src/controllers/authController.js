@@ -23,7 +23,7 @@ const sendVerificationEmail = async (user, token) => {
         subject: 'Email Verification',
         html: `<p>Xin chào ${user.username},</p>
                <p>Để xác minh email của bạn, hãy nhấp vào liên kết sau:</p>
-               <a href="http://localhost:3001/auth/verify-email?token=${token}">Xác minh email của tôi</a>`,
+               <a href="https://my-blog-server-696m.onrender.com/auth/verify-email?token=${token}">Xác minh email của tôi</a>`,
     };
 
     await transporter.sendMail(mailOptions);
