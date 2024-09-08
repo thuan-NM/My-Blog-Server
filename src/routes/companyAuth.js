@@ -12,4 +12,7 @@ compannyAuthRouter.post("/register",validateRegisterCompany, companyAuthControll
 
 compannyAuthRouter.put("/changepassword/:id",verifyAuth ,companyAuthController.companyChangePassword);
 
+compannyAuthRouter.get('/verify-email', companyAuthController.verifyEmail);
+
+
 module.exports = compannyAuthRouter;

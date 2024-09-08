@@ -1,7 +1,7 @@
 const validateRegisterCompany = (req, res, next) => {
-    const { email, password, confirmpassword } = req.body;
+    const { email, password, confirmPassword } = req.body;
 
-    if (!email || !password || !confirmpassword) {
+    if (!email || !password || !confirmPassword) {
         return res.status(400).json({
             message: "All fields are required",
             isSuccess: 0,
@@ -26,8 +26,8 @@ const validateRegisterCompany = (req, res, next) => {
     }
 
 
-    // Kiểm tra sự trùng khớp giữa password và confirmpassword
-    if (password !== confirmpassword) {
+    // Kiểm tra sự trùng khớp giữa password và confirmPassword
+    if (password !== confirmPassword) {
         return res.status(400).json({
             message: "Passwords do not match",
             isSuccess: 0,

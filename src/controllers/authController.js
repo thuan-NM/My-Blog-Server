@@ -23,7 +23,7 @@ const sendVerificationEmail = async (user, token) => {
         subject: 'Email Verification',
         html: `<p>Xin chào ${user.username},</p>
                <p>Để xác minh email của bạn, hãy nhấp vào liên kết sau:</p>
-               <a href="https://my-blog-server-696m.onrender.com/auth/verify-email?token=${token}">Xác minh email của tôi</a>`,
+               <a href="http://localhost:3000/auth/verifyemail?token=${token}">Xác minh email của tôi</a>`,
     };
 
     await transporter.sendMail(mailOptions);
@@ -127,7 +127,7 @@ const loginWithGoogle = async (req, res) => {
         });
 
         const payload = ticket.getPayload();
-        const { sub: googleId, email, given_name: firstName, family_name: lastName, picture: profilePictureUrl,email_verified:isVerified } = payload;
+        const { sub: googleId, email, given_name: firstName, family_name: lastName, picture: profilePictureUrl, email_verified: isVerified } = payload;
 
         // Kiểm tra xem người dùng đã tồn tại chưa dựa trên googleId
         let user = await User.findOne({ username: googleId });
@@ -220,7 +220,7 @@ const verifyEmail = async (req, res) => {
         user.isVerified = true;
         await user.save();
 
-        res.json({ message: 'Email verified successfully!', isSuccess: 1 });
+        res.json({ message: 'Email người dùng đã được xác thực thành công!', isSuccess: 1 });
     } catch (err) {
         console.error('Error during email verification:', err);
         res.status(400).json({ message: 'Invalid or expired token', isSuccess: 0 });
