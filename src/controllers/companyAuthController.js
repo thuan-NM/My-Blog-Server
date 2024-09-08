@@ -26,6 +26,8 @@ const companyRegister = async (req, res) => {
       country,
       address: "",
       profilePictureUrl: "",
+      coverPictureUrl: "",
+      field: "",
     });
 
     await newCompany.save();

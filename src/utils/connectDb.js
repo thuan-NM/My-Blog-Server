@@ -5,7 +5,7 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
 const Reaction = require('../models/Reaction');
-// const Company = require('./models/Company');
+const Company = require('../models/Company');
 // const Overview = require('./models/Overview');
 // const Experience = require('./models/Experience');
 // const Education = require('./models/Education');
@@ -18,7 +18,7 @@ const db = {
   User,
   Comment,
   Reaction,
-  // Company,
+  Company,
   // Overview,
   // Experience,
   // Education,
