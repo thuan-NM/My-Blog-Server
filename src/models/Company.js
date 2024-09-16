@@ -9,11 +9,9 @@ const companySchema = new mongoose.Schema({
     coverPictureUrl: { type: String, default: "" },
     field: { type: String, default: "" },
     phoneNumber: { type: String, default: "" },
-    numberOfEmployees: { type: Number, default: 0 },
+    numberOfEmployees: { type: String, default: 0 },
     isVerified: { type: Boolean, default: false },
     socialMediaLinks: {
-        linkedIn: { type: String, default: "" },
-        twitter: { type: String, default: "" },
         facebook: { type: String, default: "" },
         websiteUrl: { type: String, default: "" },
     },

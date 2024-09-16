@@ -7,7 +7,7 @@ const Comment = require("../models/Comment");
 const getCompanies = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const pageSize = parseInt(req.query.pageSize) || 5;
+    const pageSize = parseInt(req.query.pageSize) || 20;
     const skip = (page - 1) * pageSize;
 
     const [companies, totalCount] = await Promise.all([

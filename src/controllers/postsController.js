@@ -7,7 +7,7 @@ const User = require('../models/User')
 const getPosts = async (req, res) => {
   try {
     const [posts, totalCount] = await Promise.all([
-      Post.find({}).sort({ createdAt: -1 }),
+      Post.find({}).sort({ createdAt: -1 }).limit(50),
       Post.countDocuments({}),
     ]);
 
