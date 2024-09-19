@@ -1,89 +1,34 @@
-const { ObjectId } = require("mongodb");
-const { db } = require("../utils/connectDb");
-const WebSocket = require("ws");
+const Message = require('../models/Message');
 
-const clients = new Set();
+module.exports = (io) => {
+  io.on("connection", (socket) => {
+    console.log("User connected:", socket.id);
 
-const wss = new WebSocket.Server({ noServer: true });
-
-wss.on("connection", (ws) => {
-    clients.add(ws);
-    ws.on("close", () => {
-        clients.delete(ws);
+    // Lắng nghe sự kiện join vào room
+    socket.on("join_room", ({ room }) => {
+      socket.join(room);
+      console.log(`${socket.id} joined room: ${room}`);
     });
-});
 
-const broadcastMessage = (message) => {
-    clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
-        }
+    // Xử lý tin nhắn từ client
+    socket.on("send_message", async (data) => {
+      console.log("Message received:", data);
+      
+      // Lưu tin nhắn vào cơ sở dữ liệu
+      try {
+        const message = new Message(data);
+        await message.save();
+        
+        // Phát tin nhắn đến tất cả người trong room
+        io.to(data.room).emit("receive_message", data);
+      } catch (error) {
+        console.error("Error saving message:", error);
+      }
     });
-};
 
-const getChatMessages = async (req, res) => {
-    try {
-        const roomId = req.params.roomId;
-
-        // Get chat messages for the specified room
-        const chatMessages = await db.chatMessages.find({
-            roomId: new ObjectId(roomId),
-        }).toArray();
-
-        res.status(200).json({
-            message: "Get chat messages successful",
-            data: { chatMessages },
-            isSuccess: true,
-        });
-    } catch (error) {
-        console.error('Error getting chat messages:', error);
-        res.status(500).json({
-            message: 'Failed to get chat messages',
-            data: null,
-            isSuccess: false,
-        });
-    }
-};
-
-const sendMessage = async (req, res) => {
-    try {
-        const roomId = req.params.roomId;
-        const { userId, message } = req.body;
-
-        // Save the new message to the database
-        await db.messages.insertOne({
-            roomId: new ObjectId(roomId),
-            userId: new ObjectId(userId),
-            message,
-            timestamp: new Date(),
-        });
-
-        const newMessage = {
-            roomId,
-            userId,
-            message,
-            timestamp: new Date(),
-        };
-
-        // Broadcast the new message to all connected WebSocket clients
-        broadcastMessage(JSON.stringify(newMessage));
-
-        res.status(200).json({
-            message: "Message sent successfully",
-            isSuccess: true,
-        });
-    } catch (error) {
-        console.error('Error sending message:', error);
-        res.status(500).json({
-            message: 'Failed to send message',
-            isSuccess: false,
-        });
-    }
-};
-
-module.exports = {
-    getChatMessages,
-    sendMessage,
-    wss, // Export WebSocket server instance
-    broadcastMessage // Export broadcastMessage function
+    // Xử lý khi ngắt kết nối
+    socket.on("disconnect", () => {
+      console.log("User disconnected:", socket.id);
+    });
+  });
 };

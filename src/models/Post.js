@@ -10,7 +10,7 @@ const postSchema = new mongoose.Schema({
   },
   skills: [String],
   typeOfJob: { type: String },
-  price: { type: String },
+  price: { type: Number },
   experience: { type: String },
   workType: { type: String },
 }, {
