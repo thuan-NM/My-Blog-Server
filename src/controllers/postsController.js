@@ -30,7 +30,7 @@ const getPosts = async (req, res) => {
 const getFilterPost = async (req, res) => {
   try {
     const filter = req.body;
-    const lowercaseSkills = filter.skills.map(skill => skill.toUpperCase());
+    const lowercaseSkills = filter.skills.map(skill => skill);
     const query = {};
 
     if (lowercaseSkills.length > 0 && lowercaseSkills[0] !== "") {
@@ -42,24 +42,20 @@ const getFilterPost = async (req, res) => {
         $lte: parseFloat(filter.maxInputValue)
       };
     }
-    if (filter.country && filter.country !== "") {
-      query.country = filter.country.toUpperCase();
-    }
-    if (filter.typeOfJob && filter.typeOfJob !== "") {
-      query.typeOfJob = filter.typeOfJob.toUpperCase();
+    if (filter.location && filter.location !== "") {
+      query.country = filter.location;
     }
     if (filter.workType && filter.workType !== "") {
-      query.workType = filter.workType.toUpperCase();
-    }
-    if (filter.experience && filter.experience !== "") {
-      query.experience = filter.experience;
+      query.workType = filter.workType;
     }
 
+    console.log("query :",query)
     const [posts, totalCount] = await Promise.all([
-      Post.find(query).sort({ createdAt: -1 }),
+      Post.find(query).sort({ createdAt: -1 }).limit(20),
       Post.countDocuments(query)
-    ]);
-
+      ]);
+      
+      console.log(posts)
     res.status(200).json({
       message: "Get post list successful",
       data: posts,
