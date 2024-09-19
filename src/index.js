@@ -41,7 +41,7 @@ app.use("/messages", messageRouter);
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "https://my-blog-fronend.vercel.app", // Cho phép kết nối từ frontend
+        origin: "http://localhost:3000", // Cho phép kết nối từ frontend
         methods: ["GET", "POST"],
     },
 });
