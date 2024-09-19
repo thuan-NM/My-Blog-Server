@@ -11,7 +11,7 @@ const getCompanies = async (req, res) => {
     const skip = (page - 1) * pageSize;
 
     const [companies, totalCount] = await Promise.all([
-      Company.find().skip(skip).limit(pageSize),
+      Company.find(),
       Company.countDocuments(),
     ]);
 
