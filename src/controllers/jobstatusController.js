@@ -3,7 +3,7 @@ const JobStatus = require('../models/JobStatus'); // Your Mongoose model for Job
 const Post = require('../models/Post'); // Your Mongoose model for Post
 const User = require('../models/User'); // Your Mongoose model for User
 
-const getJobStatus = async (req, res) => {
+const getJobStatus = async(req, res) => {
     try {
         const { postid, userid } = req.body;
         if (!mongoose.Types.ObjectId.isValid(postid) || !mongoose.Types.ObjectId.isValid(userid)) {
@@ -36,7 +36,7 @@ const getJobStatus = async (req, res) => {
     }
 };
 
-const updateJobStatus = async (req, res) => {
+const updateJobStatus = async(req, res) => {
     const { status, candidateInfo } = req.body;
     try {
         const id = req.params.id;
@@ -48,9 +48,7 @@ const updateJobStatus = async (req, res) => {
             });
         }
         const updatedJobStatus = await JobStatus.findByIdAndUpdate(
-            id,
-            { $set: { status, candidateInfo } },
-            { new: true } // Return the updated document
+            id, { $set: { status, candidateInfo } }, { new: true } // Return the updated document
         );
         if (!updatedJobStatus) {
             return res.status(404).json({
@@ -74,7 +72,7 @@ const updateJobStatus = async (req, res) => {
     }
 };
 
-const createJobStatus = async (req, res) => {
+const createJobStatus = async(req, res) => {
     const { postid, userid, status, candidateInfo } = req.body;
     try {
         const existingJobStatus = await JobStatus.findOne({
@@ -110,9 +108,10 @@ const createJobStatus = async (req, res) => {
     }
 };
 
-const getJobStatusByAuthor = async (req, res) => {
+const getJobStatusByAuthor = async(req, res) => {
     try {
         const authorid = req.params.id;
+
         if (!mongoose.Types.ObjectId.isValid(authorid)) {
             return res.status(400).json({
                 message: 'Invalid user ID format',
@@ -120,31 +119,43 @@ const getJobStatusByAuthor = async (req, res) => {
                 isSuccess: false,
             });
         }
-        const posts = await Post.find({ "author._id": authorid });
-        for (let post of posts) {
+
+        // Find posts by the author
+        const posts = await Post.find({ "author.id": authorid });
+
+        // Use Promise.all to optimize the query process for each post
+        const updatedPosts = await Promise.all(posts.map(async(post) => {
             const jobStatusCount = await JobStatus.countDocuments({
                 postid: post._id,
-                status: "Applied"
+                status: "Applied",
             });
+
             const jobStatusItems = await JobStatus.find({
                 postid: post._id,
-                status: "Applied"
+                status: "Applied",
             });
-            post.jobStatusCount = jobStatusCount;
-            post.userapply = [];
-            for (let job of jobStatusItems) {
+
+            // Prepare array to store job applications details
+            const userapply = await Promise.all(jobStatusItems.map(async(job) => {
                 const user = await User.findById(job.userid);
-                const data = {
+                return {
                     user,
                     info: job.candidateInfo,
                     status: job.status,
                 };
-                post.userapply.push(data);
-            }
-        }
+            }));
+
+            // Return modified post object
+            return {
+                ...post.toObject(), // Convert post to plain JS object
+                jobStatusCount,
+                userapply,
+            };
+        }));
+
         return res.status(200).json({
             message: 'Get job status by author successful',
-            data: posts,
+            data: updatedPosts,
             isSuccess: true,
         });
     } catch (error) {
@@ -157,7 +168,7 @@ const getJobStatusByAuthor = async (req, res) => {
     }
 };
 
-const hireCandidate = async (req, res) => {
+const hireCandidate = async(req, res) => {
     const { postid } = req.body;
     const userid = req.params.id;
     if (!mongoose.Types.ObjectId.isValid(userid) || !mongoose.Types.ObjectId.isValid(postid)) {
@@ -168,10 +179,7 @@ const hireCandidate = async (req, res) => {
         });
     }
     try {
-        const result = await JobStatus.updateOne(
-            { userid, postid },
-            { $set: { status: 'Hired' } }
-        );
+        const result = await JobStatus.updateOne({ userid, postid }, { $set: { status: 'Hired' } });
         if (result.nModified === 0) {
             return res.status(404).json({
                 message: 'Job status not found',
@@ -194,7 +202,7 @@ const hireCandidate = async (req, res) => {
     }
 };
 
-const denyCandidate = async (req, res) => {
+const denyCandidate = async(req, res) => {
     const { postid } = req.body;
     const userid = req.params.id;
     if (!mongoose.Types.ObjectId.isValid(userid) || !mongoose.Types.ObjectId.isValid(postid)) {
@@ -205,10 +213,7 @@ const denyCandidate = async (req, res) => {
         });
     }
     try {
-        const result = await JobStatus.updateOne(
-            { userid, postid },
-            { $set: { status: 'Denied' } }
-        );
+        const result = await JobStatus.updateOne({ userid, postid }, { $set: { status: 'Denied' } });
         if (result.nModified === 0) {
             return res.status(404).json({
                 message: 'Job status not found',
@@ -231,7 +236,7 @@ const denyCandidate = async (req, res) => {
     }
 };
 
-const getUserAppliedPosts = async (req, res) => {
+const getUserAppliedPosts = async(req, res) => {
     try {
         const { userId, statusdata } = req.query;
         if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -268,7 +273,7 @@ const getUserAppliedPosts = async (req, res) => {
     }
 };
 
-const deleteJobStatus = async (req, res) => {
+const deleteJobStatus = async(req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({
@@ -301,7 +306,7 @@ const deleteJobStatus = async (req, res) => {
     }
 };
 
-const checkUserApplied = async (req, res) => {
+const checkUserApplied = async(req, res) => {
     const { postid, userid } = req.query;
     if (!mongoose.Types.ObjectId.isValid(postid) || !mongoose.Types.ObjectId.isValid(userid)) {
         return res.status(400).json({
