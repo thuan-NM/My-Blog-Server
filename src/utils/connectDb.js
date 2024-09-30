@@ -7,6 +7,7 @@ const Comment = require('../models/Comment');
 const Reaction = require('../models/Reaction');
 const Company = require('../models/Company');
 const Overview = require('../models/Overview');
+const KeySkill = require('../models/KeySkill');
 // const Experience = require('./models/Experience');
 // const Education = require('./models/Education');
 // const Message = require('./models/Message');
@@ -20,6 +21,7 @@ const db = {
   Reaction,
   Company,
   Overview,
+  KeySkill,
   // Experience,
   // Education,
   // Message,

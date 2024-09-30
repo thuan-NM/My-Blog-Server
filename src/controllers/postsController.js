@@ -131,6 +131,47 @@ const getPostByUserId = async (req, res) => {
   }
 };
 
+// GET posts by company id with pagination
+const getPostByCompanyId = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 5;
+    const skip = (page - 1) * pageSize;
+    const companyId = req.params.id;
+
+    if (!companyId) {
+      return res.status(400).json({
+        message: "Company ID is required",
+        isSuccess: false,
+      });
+    }
+
+    const [posts, totalCount] = await Promise.all([
+      Post.find({ "author.id": companyId }).skip(skip).limit(pageSize),
+      Post.countDocuments({ "author.id": companyId }),
+    ]);
+    
+    const totalPages = Math.ceil(totalCount / pageSize);
+
+    res.status(200).json({
+      message: "Get post list by company ID successful",
+      data: posts,
+      page,
+      pageSize,
+      totalPages,
+      totalCount,
+      isSuccess: true,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+      data: null,
+      isSuccess: false,
+    });
+  }
+};
+
+
 // CREATE new post
 const createPost = async (req, res) => {
   try {
@@ -314,6 +355,7 @@ module.exports = {
   deletePost,
   searchPosts,
   getPostByUserId,
+  getPostByCompanyId,
   getFilterPost,
   getTopPosts,
   getMostInterestPosts,

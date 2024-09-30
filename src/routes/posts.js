@@ -14,6 +14,7 @@ postsRouter.get("/mostinterest", postsController.getMostInterestPosts);
 postsRouter.get("/:id", postsController.getPostById);
 
 postsRouter.get("/user/:id", postsController.getPostByUserId);
+postsRouter.get("/company/:id", postsController.getPostByCompanyId);
 // CREATE new post
 postsRouter.post("/", verifyAuth, postsController.createPost);
 
