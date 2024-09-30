@@ -14,7 +14,7 @@ const jobStatusSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['Applied', 'Hired', 'Denied'],
+        enum: ['Applied', 'Interviewers', 'Hired', 'Denied'],
         required: true,
     },
     candidateInfo: {
