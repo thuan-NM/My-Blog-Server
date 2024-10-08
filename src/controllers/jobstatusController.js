@@ -354,64 +354,95 @@ const checkUserApplied = async(req, res) => {
 };
 
 const scheduleInterview = async(req, res) => {
-    const { postId, candidateId, interviewDate } = req.body;
+        const { postId, candidateId, interviewDate } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(postId) || !mongoose.Types.ObjectId.isValid(candidateId)) {
-        return res.status(400).json({
-            message: 'Invalid post ID or candidate ID format',
-            data: null,
-            isSuccess: false,
-        });
-    }
-
-    try {
-        // Generate a unique token for the confirmation link
-        const confirmationToken = crypto.randomBytes(32).toString('hex');
-
-        // Set initial status to "Pending Interview"
-        const updatedJobStatus = await JobStatus.updateOne({ userid: candidateId, postid: postId }, { $set: { status: 'Pending Interview', interviewDate, confirmationToken } });
-
-        if (updatedJobStatus.nModified === 0) {
-            return res.status(404).json({
-                message: 'Job status not found',
+        if (!mongoose.Types.ObjectId.isValid(postId) || !mongoose.Types.ObjectId.isValid(candidateId)) {
+            return res.status(400).json({
+                message: 'Invalid post ID or candidate ID format',
                 data: null,
                 isSuccess: false,
             });
         }
 
-        // Fetch the candidate and post details
-        const candidate = await User.findById(candidateId);
-        const job = await Post.findById(postId);
+        try {
+            // Generate a unique token for the confirmation link
+            const confirmationToken = crypto.randomBytes(32).toString('hex');
 
-        // Create the confirmation link
-        const confirmationUrl = `${process.env.FRONTEND_URL}/interview/confirm/${confirmationToken}`;
+            // Set initial status to "Pending Interview"
+            const updatedJobStatus = await JobStatus.updateOne({ userid: candidateId, postid: postId }, { $set: { status: 'Pending Interview', interviewDate, confirmationToken } });
 
-        // Send the interview email with the confirmation button
-        const transporter = nodemailer.createTransport({
-            service: 'Gmail',
-            auth: {
-                user: process.env.EMAIL_USER, // Your email
-                pass: process.env.EMAIL_PASS, // Your password
-            },
-        });
+            if (updatedJobStatus.nModified === 0) {
+                return res.status(404).json({
+                    message: 'Job status not found',
+                    data: null,
+                    isSuccess: false,
+                });
+            }
 
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: candidate.email,
-            subject: 'Interview Schedule Confirmation',
-            html: `<p>Dear ${candidate.firstName},</p>
-                <p>You have been scheduled for an interview with ${job.companyName} on ${new Date(interviewDate).toLocaleString()}.</p>
-                <p>Please confirm your availability by clicking the button below:</p>
-                <a href="${confirmationUrl}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-                    Confirm Interview
-                </a>
-                <p>If you don't confirm by the interview date, your application will be automatically denied.</p>`,
+            // Fetch the candidate and post details
+            const candidate = await User.findById(candidateId);
+            const job = await Post.findById(postId);
+
+            // Create the confirmation link
+            const confirmationUrl = `${process.env.FRONTEND_URL}/interview/confirm/${confirmationToken}`;
+
+            // Send the interview email with the confirmation button
+            const transporter = nodemailer.createTransport({
+                service: 'Gmail',
+                auth: {
+                    user: process.env.EMAIL_USER, // Your email
+                    pass: process.env.EMAIL_PASS, // Your password
+                },
+            });
+
+            const mailOptions = {
+                    from: `${job.author.userdata.companyname} <${process.env.EMAIL_USER}>`,
+                    to: candidate.email,
+                    subject: 'Interview Schedule Confirmation',
+                    html: `
+            <div style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
+                <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: white; padding: 20px; border-radius: 10px;">
+                    <tr>
+                        <td style="text-align: center; padding-bottom: 20px;">
+                            <img src={${`../../assets/myfavicon.png`}} alt="Company Logo" style="width: 150px;">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-size: 24px; font-weight: bold; text-align: center; color: #333;">Interview Confirmation</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 20px; font-size: 16px; line-height: 1.6; color: #555;">
+                            <p>Dear ${candidate.firstName},</p>
+                            <p>We are excited to inform you that you have been scheduled for an interview with <strong>${job.author.userdata.companyname}</strong> for the position you've applied for.</p>
+                            <p><strong>Interview Details:</strong></p>
+                            <ul style="list-style-type: none; padding-left: 0;">
+                                <li><strong>Date:</strong> ${new Date(interviewDate).toLocaleString()}</li>
+                                <li><strong>Company:</strong> ${job.author.userdata.companyname}</li>
+                                <li><strong>Location:${job.author.userdata.country}</li>
+                            </ul>
+                            <p>Please confirm your availability by clicking the button below:</p>
+                            <p style="text-align: center;">
+                                <a href="${confirmationUrl}" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Confirm Interview</a>
+                            </p>
+                            <p>If you are unable to confirm by the scheduled date, your application will be automatically declined.</p>
+                            <p>We look forward to meeting you!</p>
+                            <p>Best regards,</p>
+                            <p><strong>${job.author.userdata.companyname} Hiring Team</strong></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center; font-size: 12px; color: #999; padding-top: 20px; border-top: 1px solid #ddd;">
+                            <p>© ${new Date().getFullYear()} ${job.author.userdata.companyname}. All rights reserved.</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>`,
         };
 
         await transporter.sendMail(mailOptions);
 
         // Auto-deny if time exceeds
-        setTimeout(async() => {
+        setTimeout(async () => {
             const status = await JobStatus.findOne({ userid: candidateId, postid: postId });
             if (status && status.status === 'Pending Interview') {
                 await JobStatus.updateOne({ userid: candidateId, postid: postId }, { $set: { status: 'Denied' } });
@@ -433,7 +464,7 @@ const scheduleInterview = async(req, res) => {
 };
 
 // Endpoint to handle interview confirmation
-const confirmInterview = async(req, res) => {
+const confirmInterview = async (req, res) => {
     const { token } = req.params;
     try {
         const jobStatus = await JobStatus.findOne({ confirmationToken: token });
