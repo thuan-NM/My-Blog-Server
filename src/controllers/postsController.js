@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const Post = require('../models/Post');
 const Comment = require('../models/Comment');
 const Reaction = require('../models/Reaction');
-const User = require('../models/User')
+const User = require('../models/User');
+const Company = require('../models/Company');
     // GET posts
 const getPosts = async(req, res) => {
     try {
@@ -175,31 +176,30 @@ const getPostByCompanyId = async(req, res) => {
 // CREATE new post
 const createPost = async(req, res) => {
     try {
-        const { title, description, skills, typeOfJob, price, experience, workType } = req.body;
+        const { title, description, skills, price, workType, location } = req.body;
 
-        if (!title || !description || !skills || !price || !typeOfJob || !experience || !workType) {
+        if (!title || !description || !skills || !price || !workType || !location) {
             return res.status(400).json({
                 message: "All fields are required",
                 isSuccess: false,
             });
         }
 
-        const userId = req.body.user._id;
-        const user = await User.findById(userId).select('-password -friend -friendRequests -username');
+        const companyId = req.body.author.id;
+        const company = await Company.findById(companyId).select('-password -friend -friendRequests -username');
         const UppercaseSkills = skills.map(skill => skill.toUpperCase());
 
         const post = new Post({
             title: title.toUpperCase(),
             description: description.toUpperCase(),
             author: {
-                _id: userId,
-                userdata: user
+                id: companyId,
+                userdata: company
             },
             skills: UppercaseSkills,
-            typeOfJob: typeOfJob.toUpperCase(),
             price: parseFloat(price),
-            experience: experience.toUpperCase(),
             workType: workType.toUpperCase(),
+            location: location.toUpperCase(),
         });
 
         await post.save();

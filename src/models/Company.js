@@ -17,7 +17,7 @@ const companySchema = new mongoose.Schema({
     },
     location: {
         country: { type: String, required: true },
-        address: { type: String, default: "" },
+        address: { type: [String], default: [] },
         coordinates: [Number]
     }
 }, { timestamps: true });
