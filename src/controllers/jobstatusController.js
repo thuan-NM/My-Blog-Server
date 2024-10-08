@@ -354,57 +354,57 @@ const checkUserApplied = async(req, res) => {
 };
 
 const scheduleInterview = async(req, res) => {
-        const { postId, candidateId, interviewDate } = req.body;
+    const { postId, candidateId, interviewDate } = req.body;
 
-        if (!mongoose.Types.ObjectId.isValid(postId) || !mongoose.Types.ObjectId.isValid(candidateId)) {
-            return res.status(400).json({
-                message: 'Invalid post ID or candidate ID format',
+    if (!mongoose.Types.ObjectId.isValid(postId) || !mongoose.Types.ObjectId.isValid(candidateId)) {
+        return res.status(400).json({
+            message: 'Invalid post ID or candidate ID format',
+            data: null,
+            isSuccess: false,
+        });
+    }
+
+    try {
+        // Generate a unique token for the confirmation link
+        const confirmationToken = crypto.randomBytes(32).toString('hex');
+
+        // Set initial status to "Pending Interview"
+        const updatedJobStatus = await JobStatus.updateOne({ userid: candidateId, postid: postId }, { $set: { status: 'Pending Interview', interviewDate, confirmationToken } });
+
+        if (updatedJobStatus.nModified === 0) {
+            return res.status(404).json({
+                message: 'Job status not found',
                 data: null,
                 isSuccess: false,
             });
         }
 
-        try {
-            // Generate a unique token for the confirmation link
-            const confirmationToken = crypto.randomBytes(32).toString('hex');
+        // Fetch the candidate and post details
+        const candidate = await User.findById(candidateId);
+        const job = await Post.findById(postId);
 
-            // Set initial status to "Pending Interview"
-            const updatedJobStatus = await JobStatus.updateOne({ userid: candidateId, postid: postId }, { $set: { status: 'Pending Interview', interviewDate, confirmationToken } });
+        // Create the confirmation link
+        const confirmationUrl = `${process.env.FRONTEND_URL}/interview/confirm/${confirmationToken}`;
 
-            if (updatedJobStatus.nModified === 0) {
-                return res.status(404).json({
-                    message: 'Job status not found',
-                    data: null,
-                    isSuccess: false,
-                });
-            }
+        // Send the interview email with the confirmation button
+        const transporter = nodemailer.createTransport({
+            service: 'Gmail',
+            auth: {
+                user: process.env.EMAIL_USER, // Your email
+                pass: process.env.EMAIL_PASS, // Your password
+            },
+        });
 
-            // Fetch the candidate and post details
-            const candidate = await User.findById(candidateId);
-            const job = await Post.findById(postId);
-
-            // Create the confirmation link
-            const confirmationUrl = `${process.env.FRONTEND_URL}/interview/confirm/${confirmationToken}`;
-
-            // Send the interview email with the confirmation button
-            const transporter = nodemailer.createTransport({
-                service: 'Gmail',
-                auth: {
-                    user: process.env.EMAIL_USER, // Your email
-                    pass: process.env.EMAIL_PASS, // Your password
-                },
-            });
-
-            const mailOptions = {
-                    from: `${job.author.userdata.companyname} <${process.env.EMAIL_USER}>`,
-                    to: candidate.email,
-                    subject: 'Interview Schedule Confirmation',
-                    html: `
+        const mailOptions = {
+            from: `${job.author.userdata.companyname} <${process.env.EMAIL_USER}>`,
+            to: candidate.email,
+            subject: 'Interview Schedule Confirmation',
+            html: `
             <div style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
                 <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: white; padding: 20px; border-radius: 10px;">
                     <tr>
                         <td style="text-align: center; padding-bottom: 20px;">
-                            <img src={${`../../assets/myfavicon.png`}} alt="Company Logo" style="width: 150px;">
+                            <img src="../../assets/myfavicon.png" alt="Company Logo" style="width: 150px;">
                         </td>
                     </tr>
                     <tr>
@@ -418,7 +418,7 @@ const scheduleInterview = async(req, res) => {
                             <ul style="list-style-type: none; padding-left: 0;">
                                 <li><strong>Date:</strong> ${new Date(interviewDate).toLocaleString()}</li>
                                 <li><strong>Company:</strong> ${job.author.userdata.companyname}</li>
-                                <li><strong>Location:${job.author.userdata.country}</li>
+                                <li><strong>Location:${job.author.userdata.location.address[0]}</li>
                             </ul>
                             <p>Please confirm your availability by clicking the button below:</p>
                             <p style="text-align: center;">
@@ -442,7 +442,7 @@ const scheduleInterview = async(req, res) => {
         await transporter.sendMail(mailOptions);
 
         // Auto-deny if time exceeds
-        setTimeout(async () => {
+        setTimeout(async() => {
             const status = await JobStatus.findOne({ userid: candidateId, postid: postId });
             if (status && status.status === 'Pending Interview') {
                 await JobStatus.updateOne({ userid: candidateId, postid: postId }, { $set: { status: 'Denied' } });
@@ -464,7 +464,7 @@ const scheduleInterview = async(req, res) => {
 };
 
 // Endpoint to handle interview confirmation
-const confirmInterview = async (req, res) => {
+const confirmInterview = async(req, res) => {
     const { token } = req.params;
     try {
         const jobStatus = await JobStatus.findOne({ confirmationToken: token });
