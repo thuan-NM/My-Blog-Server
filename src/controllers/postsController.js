@@ -4,7 +4,7 @@ const Comment = require('../models/Comment');
 const Reaction = require('../models/Reaction');
 const User = require('../models/User');
 const Company = require('../models/Company');
-    // GET posts
+// GET posts
 const getPosts = async(req, res) => {
     try {
         const [posts, totalCount] = await Promise.all([
@@ -191,7 +191,7 @@ const createPost = async(req, res) => {
 
         const post = new Post({
             title: title.toUpperCase(),
-            description: description.toUpperCase(),
+            description: description,
             author: {
                 id: companyId,
                 userdata: company
@@ -363,10 +363,15 @@ const getRelatedPosts = async(req, res) => {
 
         const postSkills = post.skills;
 
+        // Tạo một mảng các điều kiện so sánh bằng regex để không phân biệt hoa thường
+        const skillRegexQueries = postSkills.map(skill => ({
+            skills: { $regex: new RegExp(skill, 'i') } // Tạo regex không phân biệt hoa thường
+        }));
+
         // Tìm các bài post có ít nhất một skill giống với bài post ban đầu
         const relatedPosts = await Post.find({
             _id: { $ne: postId }, // Loại bỏ post ban đầu khỏi kết quả
-            skills: { $in: postSkills }, // Tìm bài post có skill trùng
+            $or: skillRegexQueries, // Tìm bài post có skill trùng bằng regex không phân biệt hoa thường
         }).limit(4); // Giới hạn kết quả trả về là 4 bài post
 
         res.status(200).json({
@@ -382,6 +387,7 @@ const getRelatedPosts = async(req, res) => {
         });
     }
 };
+
 
 module.exports = {
     createPost,
