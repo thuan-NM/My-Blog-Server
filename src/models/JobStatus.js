@@ -14,12 +14,21 @@ const jobStatusSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['Applied', 'Interviewers', 'Hired', 'Denied'],
+        enum: ['Applied', 'Pending Interview', 'Interview', 'Hired', 'Denied'],
         required: true,
     },
-    candidateInfo: {
-        type: Schema.Types.Mixed, // Adjust according to the structure of candidateInfo
+    coverLetter: {
+        type: String,
+        required: true,
+    },
+    cvUrl: {
+        type: String,
+        required: true,
+    },
+    confirmationToken: {
+        type: String,
         required: false,
+        default: "",
     },
 }, {
     timestamps: true, // Automatically add createdAt and updatedAt fields
