@@ -8,7 +8,7 @@ require('dotenv').config();
 // Import User Model từ Mongoose
 const User = require("../models/User");
 
-const sendVerificationEmail = async (user, token) => {
+const sendVerificationEmail = async(user, token) => {
     const transporter = nodemailer.createTransport({
         service: 'Gmail',
         auth: {
@@ -23,13 +23,13 @@ const sendVerificationEmail = async (user, token) => {
         subject: 'Email Verification',
         html: `<p>Xin chào ${user.username},</p>
                <p>Để xác minh email của bạn, hãy nhấp vào liên kết sau:</p>
-               <a href="http://localhost:3000/auth/verifyemail?token=${token}">Xác minh email của tôi</a>`,
+               <a href="http://localhost:3000/auth/verifyemail/user?token=${token}">Xác minh email của tôi</a>`,
     };
 
     await transporter.sendMail(mailOptions);
 };
 
-const register = async (req, res) => {
+const register = async(req, res) => {
     try {
         const { username, email, password, confirmpassword, firstName, lastName, country } = req.body;
 
@@ -48,8 +48,6 @@ const register = async (req, res) => {
             username,
             email,
             password: hashedPassword,
-            friend: [],
-            friendRequests: [],
             firstName,
             lastName,
             country,
@@ -79,12 +77,12 @@ const register = async (req, res) => {
     }
 };
 
-const login = async (req, res) => {
+const login = async(req, res) => {
     try {
-        const { username, password } = req.body;
+        const { email, password } = req.body;
 
         // Tìm người dùng theo username
-        const user = await User.findOne({ username });
+        const user = await User.findOne({ email });
         if (!user) {
             return res.status(401).json({ message: "Invalid credentials" });
         }
@@ -116,7 +114,7 @@ const login = async (req, res) => {
 };
 
 
-const loginWithGoogle = async (req, res) => {
+const loginWithGoogle = async(req, res) => {
     const idToken = req.body.id;
 
     try {
@@ -172,7 +170,7 @@ const loginWithGoogle = async (req, res) => {
     }
 };
 
-const changePassword = async (req, res) => {
+const changePassword = async(req, res) => {
     const userId = req.params.id;
     const { currentPassword, newPassword } = req.body;
 
@@ -204,7 +202,7 @@ const changePassword = async (req, res) => {
     }
 };
 
-const verifyEmail = async (req, res) => {
+const verifyEmail = async(req, res) => {
     const { token } = req.query;
 
     try {
@@ -222,7 +220,7 @@ const verifyEmail = async (req, res) => {
 
         res.json({ message: 'Email người dùng đã được xác thực thành công!', isSuccess: 1 });
     } catch (err) {
-        console.error('Error during email verification:', err);
+        console.log('Error during email verification:', err);
         res.status(400).json({ message: 'Invalid or expired token', isSuccess: 0 });
     }
 };

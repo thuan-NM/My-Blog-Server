@@ -12,9 +12,14 @@ const jobStatusSchema = new Schema({
         ref: 'User',
         required: true,
     },
+    companyid: {
+        type: Schema.Types.ObjectId,
+        ref: 'Company',
+        required: true,
+    },
     status: {
         type: String,
-        enum: ['Applied', 'Pending Interview', 'Interview', 'Hired', 'Denied'],
+        enum: ['Applied', 'Interview', 'Interview Scheduled', 'Interview Confirmed', 'Reschedule Requested', 'Hired', 'Denied'], // Thêm các giá trị hợp lệ vào đây
         required: true,
     },
     coverLetter: {
@@ -24,6 +29,10 @@ const jobStatusSchema = new Schema({
     cvUrl: {
         type: String,
         required: true,
+    },
+    interviewDate: {
+        type: Date,
+        required: false,
     },
     confirmationToken: {
         type: String,

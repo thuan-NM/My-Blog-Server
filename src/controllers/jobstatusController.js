@@ -5,6 +5,8 @@ const Post = require('../models/Post'); // Your Mongoose model for Post
 const User = require('../models/User'); // Your Mongoose model for User
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const Company = require('../models/Company');
+const Room = require('../models/Room');
 
 const getJobStatus = async(req, res) => {
     try {
@@ -36,6 +38,27 @@ const getJobStatus = async(req, res) => {
             data: null,
             isSuccess: false,
         });
+    }
+};
+
+const getJobstatusDetails = async(req, res) => {
+    try {
+        const { jobStatusId } = req.params;
+
+        // Find the job status by ID in the database
+        const jobStatus = await JobStatus.findById(jobStatusId).lean();
+        if (!jobStatus) {
+            return res.status(404).json({ message: 'Job status not found' });
+        }
+
+        // Respond with the job status details, focusing on companyid and userid
+        res.status(200).json({
+            companyid: jobStatus.companyid,
+            userid: jobStatus.userid,
+        });
+    } catch (error) {
+        console.error('Error retrieving job status:', error);
+        res.status(500).json({ message: 'Error retrieving job status' });
     }
 };
 
@@ -77,6 +100,7 @@ const updateJobStatus = async(req, res) => {
 
 const createJobStatus = async(req, res) => {
     try {
+        console.log('Creating job status')
         if (!req.file) {
             return res.status(400).json({ error: 'Please upload your CV' });
         }
@@ -95,6 +119,7 @@ const createJobStatus = async(req, res) => {
             postid: req.body.postid,
             userid: req.body.userid,
             status: req.body.status,
+            companyid: req.body.companyid,
             coverLetter: req.body.coverLetter,
             cvUrl, // Lưu URL của file CV
         });
@@ -353,9 +378,9 @@ const checkUserApplied = async(req, res) => {
     }
 };
 
-const scheduleInterview = async(req, res) => {
-    const { postId, candidateId, interviewDate } = req.body;
-
+const requestConfirmation = async(req, res) => {
+    const { postId, candidateId } = req.body;
+    console.log(req.body)
     if (!mongoose.Types.ObjectId.isValid(postId) || !mongoose.Types.ObjectId.isValid(candidateId)) {
         return res.status(400).json({
             message: 'Invalid post ID or candidate ID format',
@@ -368,8 +393,14 @@ const scheduleInterview = async(req, res) => {
         // Generate a unique token for the confirmation link
         const confirmationToken = crypto.randomBytes(32).toString('hex');
 
-        // Set initial status to "Pending Interview"
-        const updatedJobStatus = await JobStatus.updateOne({ userid: candidateId, postid: postId }, { $set: { status: 'Pending Interview', interviewDate, confirmationToken } });
+        // Set initial status to "Confirmation Pending"
+        const updatedJobStatus = await JobStatus.updateOne({ userid: candidateId, postid: postId }, {
+            $set: {
+                status: 'Confirmation Pending',
+                confirmationToken,
+                tokenExpiry: Date.now() + 2 * 24 * 60 * 60 * 1000 // 2 days from now
+            }
+        });
 
         if (updatedJobStatus.nModified === 0) {
             return res.status(404).json({
@@ -384,48 +415,41 @@ const scheduleInterview = async(req, res) => {
         const job = await Post.findById(postId);
 
         // Create the confirmation link
-        const confirmationUrl = `${process.env.FRONTEND_URL}/interview/confirm/${confirmationToken}`;
+        const confirmationUrl = `${process.env.FRONTEND_URL}/sendrequest/confirm/${confirmationToken}`;
 
-        // Send the interview email with the confirmation button
+        // Send the confirmation request email
         const transporter = nodemailer.createTransport({
             service: 'Gmail',
             auth: {
-                user: process.env.EMAIL_USER, // Your email
-                pass: process.env.EMAIL_PASS, // Your password
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
             },
         });
 
         const mailOptions = {
             from: `${job.author.userdata.companyname} <${process.env.EMAIL_USER}>`,
             to: candidate.email,
-            subject: 'Interview Schedule Confirmation',
+            subject: 'Interview Confirmation Request',
             html: `
             <div style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
                 <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: white; padding: 20px; border-radius: 10px;">
                     <tr>
                         <td style="text-align: center; padding-bottom: 20px;">
-                            <img src="${job.author.userdata.profilePictureUrl}" alt="Company Logo" style="width: 150px;">
+                            <img src="${encodeURI(job.author.userdata.profilePictureUrl)}" alt="Company Logo" style="width: 150px;">
                         </td>
                     </tr>
                     <tr>
-                        <td style="font-size: 24px; font-weight: bold; text-align: center; color: #333;">Interview Confirmation</td>
+                        <td style="font-size: 24px; font-weight: bold; text-align: center; color: #333;">Interview Confirmation Request</td>
                     </tr>
                     <tr>
                         <td style="padding: 20px; font-size: 16px; line-height: 1.6; color: #555;">
                             <p>Dear ${candidate.firstName},</p>
-                            <p>We are excited to inform you that you have been scheduled for an interview with <strong>${job.author.userdata.companyname}</strong> for the position you've applied for.</p>
-                            <p><strong>Interview Details:</strong></p>
-                            <ul style="list-style-type: none; padding-left: 0;">
-                                <li><strong>Date:</strong> ${new Date(interviewDate).toLocaleString()}</li>
-                                <li><strong>Company:</strong> ${job.author.userdata.companyname}</li>
-                                <li><strong>Location:${job.author.userdata.location.address[0]}</li>
-                            </ul>
-                            <p>Please confirm your availability by clicking the button below:</p>
+                            <p>You have received a request to confirm your interest in an interview for the position at <strong>${job.author.userdata.companyname}</strong>.</p>
+                            <p>Please confirm your participation by clicking the button below within 2 days:</p>
                             <p style="text-align: center;">
                                 <a href="${confirmationUrl}" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Confirm Interview</a>
                             </p>
-                            <p>If you are unable to confirm by the scheduled date, your application will be automatically declined.</p>
-                            <p>We look forward to meeting you!</p>
+                            <p>If you do not confirm within the specified time, the interview request will expire.</p>
                             <p>Best regards,</p>
                             <p><strong>${job.author.userdata.companyname} Hiring Team</strong></p>
                         </td>
@@ -441,30 +465,24 @@ const scheduleInterview = async(req, res) => {
 
         await transporter.sendMail(mailOptions);
 
-        // Auto-deny if time exceeds
-        setTimeout(async() => {
-            const status = await JobStatus.findOne({ userid: candidateId, postid: postId });
-            if (status && status.status === 'Pending Interview') {
-                await JobStatus.updateOne({ userid: candidateId, postid: postId }, { $set: { status: 'Denied' } });
-            }
-        }, new Date(interviewDate).getTime() - Date.now());
-
         res.status(200).json({
-            message: 'Interview scheduled, email sent, and awaiting confirmation.',
+            message: 'Confirmation request sent, awaiting candidate response.',
             isSuccess: true,
         });
 
     } catch (error) {
-        console.error('Error scheduling interview:', error);
+        console.error('Error sending confirmation request:', error);
         res.status(500).json({
-            message: 'Failed to schedule interview',
+            message: 'Failed to send confirmation request',
             isSuccess: false,
         });
     }
 };
 
+
+
 // Endpoint to handle interview confirmation
-const confirmInterview = async(req, res) => {
+const confirmRequest = async(req, res) => {
     const { token } = req.params;
     try {
         const jobStatus = await JobStatus.findOne({ confirmationToken: token });
@@ -493,7 +511,370 @@ const confirmInterview = async(req, res) => {
     }
 };
 
+const getInterviewCandidates = async(req, res) => {
+    try {
+        const authorId = req.params.id; // Assuming this is the author's user ID
+
+        if (!mongoose.Types.ObjectId.isValid(authorId)) {
+            return res.status(400).json({
+                message: 'Invalid author ID format',
+                data: null,
+                isSuccess: false,
+            });
+        }
+
+        // Find job posts created by the author
+        const posts = await Post.find({ "author.id": authorId }, "_id title");
+
+        if (posts.length === 0) {
+            return res.status(404).json({
+                message: 'No job posts found for this author',
+                data: [],
+                isSuccess: false,
+            });
+        }
+
+        // Extract post IDs
+        const postIds = posts.map(post => post._id);
+
+        // Find job statuses with "Interview" status for those posts
+        const jobStatusItems = await JobStatus.find({
+            postid: { $in: postIds },
+            status: { $in: ["Interview", "Reschedule Requested"] },
+        });
+
+        if (jobStatusItems.length === 0) {
+            return res.status(404).json({
+                message: 'No candidates with "Interview" status found',
+                data: [],
+                isSuccess: false,
+            });
+        }
+
+        // Fetch detailed candidate information
+        const candidates = await Promise.all(jobStatusItems.map(async(jobStatus) => {
+            const user = await User.findById(jobStatus.userid, "firstName lastName email");
+            const post = posts.find(p => p._id.equals(jobStatus.postid));
+            return {
+                user,
+                jobTitle: post ? post.title : "Unknown",
+                postId: jobStatus.postid, // Thêm trường postId
+                cv: jobStatus.cvUrl,
+                coverLetter: jobStatus.coverLetter,
+                status: jobStatus.status,
+                interviewDate: jobStatus.interviewDate || new Date()
+            };
+        }));
+
+        return res.status(200).json({
+            message: 'Interview candidates fetched successfully',
+            data: candidates,
+            isSuccess: true,
+        });
+    } catch (error) {
+        console.error('Error fetching interview candidates:', error);
+        res.status(500).json({
+            message: 'Failed to fetch interview candidates',
+            data: null,
+            isSuccess: false,
+        });
+    }
+};
+
+
+// Function to schedule an interview
+const scheduleInterview = async(req, res) => {
+    const { postId, candidateId, interviewDate } = req.body;
+
+    try {
+        console.log(interviewDate);
+        // Cập nhật thông tin phỏng vấn
+        const jobStatus = await JobStatus.findOneAndUpdate({ postid: postId, userid: candidateId }, {
+            $set: {
+                interviewDate,
+                status: 'Interview Scheduled'
+            }
+        }, { new: true });
+
+        if (!jobStatus) {
+            return res.status(404).json({
+                message: 'Job application not found',
+                isSuccess: false
+            });
+        }
+
+        // Lấy thông tin ứng viên
+        const candidate = await User.findById(candidateId);
+        if (!candidate) {
+            return res.status(404).json({
+                message: 'Candidate not found',
+                isSuccess: false
+            });
+        }
+
+        // Tạo đường link chấp nhận và dời lịch
+        const acceptUrl = `${process.env.FRONTEND_URL}/interview/accept/${jobStatus._id}`;
+        const rescheduleUrl = `${process.env.FRONTEND_URL}/interview/reschedule/${jobStatus._id}`;
+
+        // Thiết lập gửi email
+        const transporter = nodemailer.createTransport({
+            service: 'Gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            },
+        });
+
+        const mailOptions = {
+            from: `"Company" <${process.env.EMAIL_USER}>`,
+            to: candidate.email,
+            subject: 'Interview Schedule Notification',
+            html: `
+                <div style="background-color: #f9f9f9; padding: 20px; font-family: Arial, sans-serif;">
+                    <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
+                        <tr>
+                            <td style="text-align: center; padding-bottom: 20px;">
+                                <h2 style="color: #333333; margin-bottom: 0;">Interview Schedule Notification</h2>
+                                <p style="color: #666666; margin-top: 5px;">You have a new interview scheduled</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                                <p>Dear ${candidate.firstName},</p>
+                                <p>We are pleased to inform you that you have been scheduled for an interview. Below are the details:</p>
+                                <p><strong>Date and Time:</strong> ${new Date(interviewDate).toLocaleString()}</p>
+                                <p>Please confirm your participation or request a reschedule using one of the options below:</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center; padding: 20px;">
+                                <a href="${acceptUrl}" style="background-color: #28a745; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; margin-right: 10px; display: inline-block;">Accept Interview</a>
+                                <a href="${rescheduleUrl}" style="background-color: #ff9800; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Reschedule Interview</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-top: 20px; font-size: 14px; color: #888888; text-align: center; border-top: 1px solid #eeeeee;">
+                                <p>If you have any questions, feel free to contact us at support@company.com.</p>
+                                <p>Best regards,<br><strong>Company Hiring Team</strong></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center; font-size: 12px; color: #aaaaaa; padding-top: 20px;">
+                                <p>© ${new Date().getFullYear()} Company. All rights reserved.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            `
+        };
+
+        // Gửi email
+        await transporter.sendMail(mailOptions);
+
+        res.status(200).json({
+            message: 'Interview scheduled and notification sent to candidate',
+            isSuccess: true,
+            data: jobStatus
+        });
+    } catch (error) {
+        console.error('Error scheduling interview:', error);
+        res.status(500).json({
+            message: 'Failed to schedule interview',
+            isSuccess: false
+        });
+    }
+};
+const acceptInterview = async(req, res) => {
+    const { jobStatusId } = req.params;
+    console.log(jobStatusId);
+    try {
+        console.log("Accepting interview for Job Status ID:", jobStatusId);
+        const jobStatus = await JobStatus.findById(jobStatusId);
+        if (!jobStatus) {
+            return res.status(404).json({
+                message: 'Job status not found',
+                isSuccess: false
+            });
+        }
+
+        if (jobStatus.status !== 'Interview Scheduled') {
+            return res.status(400).json({
+                message: 'Hành động không hợp lệ!',
+                isSuccess: false
+            });
+        }
+
+        jobStatus.status = 'Interview Confirmed';
+        await jobStatus.save();
+
+        // Lấy thông tin ứng viên và công ty
+        const candidate = await User.findById(jobStatus.userid);
+        const company = await Company.findById(jobStatus.companyid);
+
+        // Tạo đường link gọi video
+        const videoCallUrl = `http://localhost:4000/call/${candidate._id}/${company._id}`;
+
+        // Gửi email xác nhận
+        const transporter = nodemailer.createTransport({
+            service: 'Gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            },
+        });
+
+        const mailOptions = {
+            from: `"Company" <${process.env.EMAIL_USER}>`,
+            to: candidate.email,
+            subject: 'Interview Confirmation',
+            html: `
+                <div style="background-color: #f9f9f9; padding: 20px; font-family: Arial, sans-serif;">
+                    <h2 style="color: #333333;">Interview Confirmation</h2>
+                    <p>Dear ${candidate.firstName},</p>
+                    <p>You have successfully confirmed the interview. Below are the details:</p>
+                    <p><strong>Date and Time:</strong> ${new Date(jobStatus.interviewDate).toLocaleString()}</p>
+                    <p>Click the link below to join the video call at the scheduled time:</p>
+                    <a href="${videoCallUrl}" style="background-color: #28a745; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px;">Join Video Call</a>
+                </div>
+            `,
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.status(200).json({
+            message: 'Interview accepted and confirmation email sent',
+            isSuccess: true,
+            data: jobStatus
+        });
+    } catch (error) {
+        console.error('Error accepting interview:', error);
+        res.status(500).json({
+            message: 'Failed to accept interview',
+            isSuccess: false
+        });
+    }
+};
+
+
+// Function to reschedule the interview
+const rescheduleInterview = async(req, res) => {
+    const { jobStatusId } = req.params;
+    const { newDate } = req.body;
+
+    try {
+        console.log("Rescheduling interview for Job Status ID:", jobStatusId);
+        const jobStatus = await JobStatus.findById(jobStatusId);
+
+        if (!jobStatus) {
+            return res.status(404).json({
+                message: 'Job status not found',
+                isSuccess: false
+            });
+        }
+
+        console.log("Current status:", jobStatus.status);
+        // Kiểm tra xem trạng thái hiện tại có phải là "Interview Scheduled" không
+        if (jobStatus.status !== 'Interview Scheduled') {
+            return res.status(400).json({
+                message: 'Hành động không hợp lệ!',
+                isSuccess: false
+            });
+        }
+
+        // Cập nhật trạng thái thành "Reschedule Requested"
+        jobStatus.status = 'Reschedule Requested';
+        await jobStatus.save();
+
+        // Phản hồi thành công
+        res.status(200).json({
+            message: 'Reschedule request submitted',
+            isSuccess: true,
+            data: jobStatus
+        });
+    } catch (error) {
+        console.error('Error rescheduling interview:', error);
+        res.status(500).json({
+            message: 'Failed to reschedule interview',
+            isSuccess: false
+        });
+    }
+};
+
+const getInterviewConfirmedCandidates = async(req, res) => {
+    try {
+        const authorId = req.params.id; // ID của công ty
+
+        if (!mongoose.Types.ObjectId.isValid(authorId)) {
+            return res.status(400).json({
+                message: 'Invalid author ID format',
+                data: null,
+                isSuccess: false,
+            });
+        }
+
+        // Tìm các bài đăng do công ty tạo
+        const posts = await Post.find({ "author.id": authorId }, "_id title");
+
+        if (posts.length === 0) {
+            return res.status(404).json({
+                message: 'No job posts found for this author',
+                data: [],
+                isSuccess: false,
+            });
+        }
+
+        // Lấy các ID bài đăng
+        const postIds = posts.map(post => post._id);
+
+        // Tìm các trạng thái công việc có status "Interview Confirmed"
+        const jobStatusItems = await JobStatus.find({
+            postid: { $in: postIds },
+            status: "Interview Confirmed",
+        });
+
+        if (jobStatusItems.length === 0) {
+            return res.status(404).json({
+                message: 'No candidates with "Interview Confirmed" status found',
+                data: [],
+                isSuccess: false,
+            });
+        }
+
+        // Lấy thông tin ứng viên, phòng phỏng vấn và companyKey
+        const candidates = await Promise.all(jobStatusItems.map(async(jobStatus) => {
+            const user = await User.findById(jobStatus.userid, "firstName lastName email");
+            const post = posts.find(p => p._id.equals(jobStatus.postid));
+            const room = await Room.findOne({ "name": `${jobStatus.userid.toString()}-${jobStatus.companyid.toString()}` });
+            return {
+                user,
+                jobTitle: post ? post.title : "Unknown",
+                postId: jobStatus.postid,
+                cv: jobStatus.cvUrl,
+                coverLetter: jobStatus.coverLetter,
+                status: jobStatus.status,
+                interviewDate: jobStatus.interviewDate || null,
+                roomKey: room ? room.userkey : null, // Hoặc sử dụng companykey tùy nhu cầu
+                companyKey: room ? room.companykey : null, // Thêm companyKey vào đối tượng ứng viên
+            };
+        }));
+
+        return res.status(200).json({
+            message: 'Interview confirmed candidates fetched successfully',
+            data: candidates,
+            isSuccess: true,
+        });
+    } catch (error) {
+        console.error('Error fetching interview confirmed candidates:', error);
+        res.status(500).json({
+            message: 'Failed to fetch interview confirmed candidates',
+            data: null,
+            isSuccess: false,
+        });
+    }
+};
+
 module.exports = {
+    getJobstatusDetails,
     getJobStatus,
     updateJobStatus,
     createJobStatus,
@@ -504,6 +885,11 @@ module.exports = {
     deleteJobStatus,
     checkUserApplied,
     getCandidateOfJob,
+    requestConfirmation,
+    confirmRequest,
+    getInterviewCandidates,
     scheduleInterview,
-    confirmInterview,
+    acceptInterview,
+    rescheduleInterview,
+    getInterviewConfirmedCandidates
 };

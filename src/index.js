@@ -18,6 +18,7 @@ const educationsRoute = require("./routes/educations");
 const jobstatusRoute = require("./routes/jobstatus");
 const followRouter = require("./routes/follow");
 const messageRouter = require('./routes/message');
+require('./cronJobs');
 
 const app = express();
 const port = 3001;
