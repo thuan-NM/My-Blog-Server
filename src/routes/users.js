@@ -23,12 +23,6 @@ usersRouter.get("/:id", userController.getUserById);
 
 usersRouter.put("/:id",verifyAuth, upload.single('image'), userController.updateUser);
 
-usersRouter.put('/:id/accept-friend-request', verifyAuth, userController.acceptFriendRequest);
-
-usersRouter.put('/:id/send-friend-request', verifyAuth, userController.sendFriendRequest);
-
-usersRouter.put('/:id/remove-friend', verifyAuth, userController.removeFriend);
-
 usersRouter.post('/update-picture/:id', verifyAuth, upload.single('profilePicture'), userController.updatePictures);
 
 usersRouter.post('/update-cover-picture/:id', verifyAuth, upload.single('coverPicture'), userController.updateCoverPicture);

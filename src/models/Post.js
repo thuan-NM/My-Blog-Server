@@ -11,9 +11,23 @@ const postSchema = new mongoose.Schema({
     skills: { type: [String] },
     price: { type: Number },
     workType: { type: String },
-    location: { type: String },
+    location: {
+        type: {
+            type: String,
+            enum: ['Point'], // Must be 'Point'
+            required: true,
+        },
+        coordinates: {
+            type: [Number], // [longitude, latitude]
+            required: true,
+        },
+        address: { type: String, required: true },
+    },
 }, {
     timestamps: true
 });
+
+// Create a 2dsphere index on the location field
+postSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Post', postSchema);

@@ -37,6 +37,7 @@ async function connectDb() {
     await mongoose.connect(MONGODB_URL, {
       // useNewUrlParser: true,
       // useUnifiedTopology: true,
+      autoIndex: true,
     });
   } catch (error) {
     console.error("Error connecting to the database", error);

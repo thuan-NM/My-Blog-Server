@@ -60,10 +60,27 @@ const getUserById = async (req, res) => {
 };
 
 const updateUser = async (req, res) => {
-  const { email, firstName, lastName, dob, address } = req.body;
+  const { username, email, firstName, lastName, dob, address, country } = req.body;
   try {
     const id = req.params.id;
-    const userdata = { email, firstName: firstName.trim(), lastName: lastName.trim(), dob: dob.trim(), address: address.trim() };
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: 'Invalid user ID format',
+        data: null,
+        isSuccess: false,
+      });
+    }
+
+    const userdata = {
+      username: username.trim(),
+      email: email?.trim(),  // Nếu không gửi email từ front-end, giữ nguyên email cũ
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      dob: dob ? new Date(dob) : null, // Chuyển chuỗi dob sang Date object
+      address: address.trim(),
+      country: country.trim(),
+    };
 
     const user = await User.findByIdAndUpdate(id, { $set: userdata }, { new: true }).exec();
     await Post.updateMany({ 'author._id': id }, { $set: { 'author.userdata': userdata } });
@@ -80,90 +97,6 @@ const updateUser = async (req, res) => {
       data: null,
       isSuccess: false,
     });
-  }
-};
-
-const acceptFriendRequest = async (req, res) => {
-  const userId = req.params.id;
-  const { friendRequest, acceptRequest } = req.body;
-
-  try {
-    const user1 = await User.findById(userId).exec();
-    const user2 = await User.findById(friendRequest._id).exec();
-
-    if (!user1 || !user2) {
-      return res.status(404).json({ message: 'User not found', isSuccess: 0 });
-    }
-
-    if (acceptRequest) {
-      user1.friend.push(user2._id);
-      user2.friend.push(user1._id);
-
-      user1.friendRequests = user1.friendRequests.filter(req => req.toString() !== user2._id.toString());
-      user2.friendRequests = user2.friendRequests.filter(req => req.toString() !== user1._id.toString());
-    } else {
-      user1.friendRequests = user1.friendRequests.filter(req => req.toString() !== user2._id.toString());
-      user2.friendRequests = user2.friendRequests.filter(req => req.toString() !== user1._id.toString());
-    }
-
-    await user1.save();
-    await user2.save();
-
-    res.json({ message: 'Friend request processed successfully', isSuccess: 1, data: user1 });
-  } catch (error) {
-    console.error('Error processing friend request:', error);
-    res.status(500).json({ message: 'Failed to process friend request', isSuccess: 0 });
-  }
-};
-
-const sendFriendRequest = async (req, res) => {
-  const userId = req.params.id;
-  const { friend } = req.body;
-
-  try {
-    const user = await User.findById(userId).exec();
-    const friendUser = await User.findById(friend._id).exec();
-
-    if (!user || !friendUser) {
-      return res.status(404).json({ message: 'User not found', isSuccess: 0 });
-    }
-
-    if (friendUser.friendRequests.includes(user._id)) {
-      return res.status(400).json({ message: 'Friend request already sent', isSuccess: 0 });
-    }
-
-    friendUser.friendRequests.push(user._id);
-    await friendUser.save();
-
-    res.json({ message: 'Friend request sent successfully', isSuccess: 1 });
-  } catch (error) {
-    console.error('Error sending friend request:', error);
-    res.status(500).json({ message: 'Failed to send friend request', isSuccess: 0 });
-  }
-};
-
-const removeFriend = async (req, res) => {
-  const userId = req.params.id;
-  const { friendId } = req.body;
-
-  try {
-    const user = await User.findById(userId).exec();
-    const friendToRemove = await User.findById(friendId).exec();
-
-    if (!user || !friendToRemove) {
-      return res.status(404).json({ message: 'User not found', isSuccess: 0 });
-    }
-
-    user.friend = user.friend.filter(friend => friend.toString() !== friendId.toString());
-    friendToRemove.friend = friendToRemove.friend.filter(friend => friend.toString() !== userId.toString());
-
-    await user.save();
-    await friendToRemove.save();
-
-    res.json({ message: 'Friend removed successfully', isSuccess: 1, data: user });
-  } catch (error) {
-    console.error('Error removing friend:', error);
-    res.status(500).json({ message: 'Failed to remove friend', isSuccess: 0 });
   }
 };
 
@@ -248,10 +181,7 @@ module.exports = {
   getUsers,
   getUserById,
   updateUser,
-  acceptFriendRequest,
-  sendFriendRequest,
   searchUsers,
-  removeFriend,
   updatePictures,
   updateCoverPicture,
 };

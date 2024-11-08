@@ -73,27 +73,29 @@ const getCompanyById = async(req, res) => {
 };
 
 const updateCompany = async(req, res) => {
-    const { email, firstName, lastName, country, address } = req.body;
+    const { email, companyname, field, phoneNumber, numberOfEmployees, socialMediaLinks, location } = req.body;
     try {
         const id = req.params.id;
 
         const updatedCompany = await Company.findByIdAndUpdate(
             id, {
                 email,
-                companyname: firstName,
-                country,
-                address,
+                companyname,
+                field,
+                phoneNumber,
+                numberOfEmployees,
+                socialMediaLinks,
+                location,
             }, { new: true }
         );
 
-        const companydata = {
-            email,
-            firstName,
-            lastName,
-            address,
-        };
-
-        await Post.updateMany({ 'author._id': id }, { $set: { 'author.userdata': companydata } });
+        if (!updatedCompany) {
+            return res.status(404).json({
+                message: 'Company not found',
+                data: null,
+                isSuccess: false,
+            });
+        }
 
         res.status(200).json({
             message: "Update company by id successful",
@@ -147,7 +149,6 @@ const updateCoverPicture = async(req, res) => {
             folder: 'cover-pictures',
             public_id: `${req.params.id}_${Date.now()}`,
         });
-
 
         const coverPictureUrl = result.secure_url;
 

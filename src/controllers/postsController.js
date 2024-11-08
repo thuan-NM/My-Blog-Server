@@ -2,13 +2,79 @@ const mongoose = require('mongoose');
 const Post = require('../models/Post');
 const Comment = require('../models/Comment');
 const Reaction = require('../models/Reaction');
-const User = require('../models/User');
 const Company = require('../models/Company');
+const NodeCache = require('node-cache');
+const geocodeCache = new NodeCache({ stdTTL: 86400 }); // Cache for 1 day
+const axios = require('axios');
+require('dotenv').config();
+
+// preprocess
+const preprocessLocation = (location) => {
+    // Split the address using common delimiters
+    const addressParts = location.split(/,|\n|;/).map(part => part.trim());
+
+    // Prioritize components (you can adjust this logic)
+    const components = [];
+    if (addressParts.length > 0) components.push(addressParts[addressParts.length - 1]); // Country
+    if (addressParts.length > 1) components.unshift(addressParts[addressParts.length - 2]); // State/Province
+    if (addressParts.length > 2) components.unshift(addressParts[addressParts.length - 3]); // City
+
+    const reconstructedAddress = components.join(', ');
+
+    // Ensure the reconstructed address is within 256 characters
+    return reconstructedAddress.substring(0, 256);
+};
+
+const getCoordinates = async (address) => {
+    if (!address) {
+        console.error('No address provided for geocoding.');
+        return null;
+    }
+
+    // Preprocess the address
+    const preprocessedAddress = preprocessLocation(address);
+
+    if (!preprocessedAddress) {
+        console.error(`Preprocessing failed for address: ${address}`);
+        return null;
+    }
+
+    // Check cache first
+    const cachedData = geocodeCache.get(preprocessedAddress);
+    if (cachedData) {
+        return cachedData;
+    }
+
+    const apiKey = process.env.GEOCODING_API_KEY;
+    const encodedAddress = encodeURIComponent(preprocessedAddress);
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${apiKey}`;
+
+    try {
+        const response = await axios.get(url);
+        if (response.data.features && response.data.features.length > 0) {
+            const [longitude, latitude] = response.data.features[0].geometry.coordinates;
+            const locationData = {
+                coordinates: [longitude, latitude], // [longitude, latitude]
+                address: response.data.features[0].place_name,
+            };
+            // Cache the result
+            geocodeCache.set(preprocessedAddress, locationData);
+            return locationData;
+        } else {
+            console.error(`Address not found for: ${preprocessedAddress}`);
+            return null;
+        }
+    } catch (error) {
+        console.error(`Error fetching coordinates for address: ${preprocessedAddress}`, error.message);
+        return null;
+    }
+};
+
 // GET posts
 const getPosts = async(req, res) => {
     try {
         const [posts, totalCount] = await Promise.all([
-            Post.find({}).sort({ createdAt: -1 }).limit(50),
+            Post.find({}).sort({ createdAt: -1 }).limit(20),
             Post.countDocuments({}),
         ]);
 
@@ -27,50 +93,129 @@ const getPosts = async(req, res) => {
     }
 };
 
-// GET filtered posts
-const getFilterPost = async(req, res) => {
+const getFilterPost = async (req, res) => {
     try {
         const filter = req.body;
-        const lowercaseSkills = filter.skills.map(skill => skill);
         const query = {};
+        let sortOption = { createdAt: -1 }; // Default sort by newest
 
-        if (lowercaseSkills.length > 0 && lowercaseSkills[0] !== "") {
-            query.skills = { $in: lowercaseSkills };
+        // 1. Filter by skills (case-insensitive) with optimized regex
+        if (filter.skills && Array.isArray(filter.skills) && filter.skills.length > 0 && filter.skills[0].trim() !== "") {
+            // Sanitize and escape each skill to prevent regex injection
+            const sanitizedSkills = filter.skills
+                .map(skill => skill.trim())
+                .filter(skill => skill.length > 0)
+                .map(skill => skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); // Escape special regex characters
+
+            if (sanitizedSkills.length > 0) {
+                // Combine all skills into a single regex pattern using OR (|)
+                const regexPattern = sanitizedSkills.join("|");
+                query.skills = { $regex: regexPattern, $options: 'i' }; // Case-insensitive
+            }
         }
-        if (!isNaN(filter.minInputValue) && !isNaN(filter.maxInputValue) && filter.minInputValue !== null && filter.maxInputValue !== null) {
+
+        // 2. Filter by price range
+        if (
+            typeof filter.minInputValue === 'number' &&
+            typeof filter.maxInputValue === 'number' &&
+            filter.minInputValue !== null &&
+            filter.maxInputValue !== null
+        ) {
             query.price = {
                 $gte: parseFloat(filter.minInputValue),
                 $lte: parseFloat(filter.maxInputValue)
             };
         }
-        if (filter.location && filter.location !== "") {
-            query.country = filter.location;
-        }
-        if (filter.workType && filter.workType !== "") {
-            query.workType = filter.workType;
+
+        // 3. Filter by work type (case-insensitive)
+        if (filter.workType && filter.workType.trim() !== "") {
+            query.workType = { $regex: new RegExp(`^${filter.workType.trim()}$`, 'i') };
         }
 
-        console.log("query :", query)
-        const [posts, totalCount] = await Promise.all([
-            Post.find(query).sort({ createdAt: -1 }).limit(20),
-            Post.countDocuments(query)
-        ]);
+        // 4. Filter by company name (case-insensitive)
+        if (filter.companyName && filter.companyName.trim() !== "") {
+            query["author.userdata.companyname"] = { $regex: new RegExp(filter.companyName.trim(), 'i') };
+        }
 
-        console.log(posts)
+        // 5. If location filter is provided, add $near to the query
+        if (filter.location && filter.location.trim() !== "") {
+            // Get user's coordinates from the provided location
+            const locationData = await getCoordinates(filter.location); // { coordinates: [lng, lat], address: "..." }
+
+            if (!locationData || !Array.isArray(locationData.coordinates) || locationData.coordinates.length !== 2) {
+                throw new Error("Invalid coordinates received from geocoding service for user's location.");
+            }
+
+            query.location = {
+                $near: {
+                    $geometry: {
+                        type: "Point",
+                        coordinates: locationData.coordinates
+                    },
+                    $maxDistance: 20000 // 20 km, bạn có thể điều chỉnh tùy ý
+                }
+            };
+        }
+
+        // 6. Apply initial filters to get a set of posts
+        let mongoQuery = Post.find(query).sort(sortOption).limit(100); // Adjust limit as needed
+
+        // 7. If sorting by most likes, adjust sorting
+        if (filter.sortBy === "mostLikes") {
+            // Get the reaction counts for the filtered posts
+            const postIds = await Post.find(query).select('_id').limit(100).lean();
+            const ids = postIds.map(post => post._id);
+
+            const reactions = await Reaction.aggregate([
+                { $match: { postId: { $in: ids } } },
+                { $group: { _id: "$postId", totalReactions: { $sum: 1 } } },
+            ]);
+
+            // Create a mapping of postId to totalReactions
+            const reactionsMap = {};
+            reactions.forEach(item => {
+                reactionsMap[item._id.toString()] = item.totalReactions;
+            });
+
+            // Fetch posts and sort them based on totalReactions
+            const posts = await mongoQuery.lean(); // Get lean documents
+
+            filteredPosts = posts.map(post => ({
+                ...post,
+                totalReactions: reactionsMap[post._id.toString()] || 0
+            })).sort((a, b) => b.totalReactions - a.totalReactions).slice(0, 20); // Limit to 20
+
+            const totalCount = filteredPosts.length;
+
+            res.status(200).json({
+                message: "Get post list successful",
+                data: filteredPosts,
+                totalCount: totalCount,
+                isSuccess: true
+            });
+            return;
+        }
+
+        // 8. Limit the number of posts returned
+        const filteredPosts = await mongoQuery.lean();
+        const totalCount = filteredPosts.length;
+
         res.status(200).json({
             message: "Get post list successful",
-            data: posts,
+            data: filteredPosts,
             totalCount: totalCount,
             isSuccess: true
         });
     } catch (error) {
+        console.error('Error in getFilterPost:', error);
         res.status(500).json({
             message: error.message,
             data: null,
             isSuccess: false
         });
     }
-}
+};
+
 
 // GET post by id
 const getPostById = async(req, res) => {
@@ -172,9 +317,8 @@ const getPostByCompanyId = async(req, res) => {
     }
 };
 
-
 // CREATE new post
-const createPost = async(req, res) => {
+const createPost = async (req, res) => {
     try {
         const { title, description, skills, price, workType, location } = req.body;
 
@@ -185,9 +329,19 @@ const createPost = async(req, res) => {
             });
         }
 
-        const companyId = req.body.author.id;
+        const companyId = req.body.author.id; // Assuming the user's ID is available in req.user
         const company = await Company.findById(companyId).select('-password -friend -friendRequests -username');
-        const UppercaseSkills = skills.map(skill => skill.toUpperCase());
+        const uppercaseSkills = skills.map(skill => skill.toUpperCase());
+
+        // Get coordinates from the address
+        const locationData = await getCoordinates(location);
+
+        if (!locationData) {
+            return res.status(400).json({
+                message: "Invalid location provided",
+                isSuccess: false,
+            });
+        }
 
         const post = new Post({
             title: title.toUpperCase(),
@@ -196,10 +350,14 @@ const createPost = async(req, res) => {
                 id: companyId,
                 userdata: company
             },
-            skills: UppercaseSkills,
+            skills: uppercaseSkills,
             price: parseFloat(price),
             workType: workType.toUpperCase(),
-            location: location.toUpperCase(),
+            location: {
+                type: 'Point',
+                coordinates: locationData.coordinates, // [longitude, latitude]
+                address: location,
+            },
         });
 
         await post.save();
@@ -218,6 +376,7 @@ const createPost = async(req, res) => {
         });
     }
 };
+
 
 // UPDATE post
 const updatePost = async(req, res) => {

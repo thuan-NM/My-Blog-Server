@@ -67,6 +67,7 @@ const companyRegister = async (req, res) => {
 const companyLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log(email, password);
 
     const company = await Company.findOne({ email });
     if (!company) {

@@ -404,7 +404,7 @@ const scheduleInterview = async(req, res) => {
                 <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: white; padding: 20px; border-radius: 10px;">
                     <tr>
                         <td style="text-align: center; padding-bottom: 20px;">
-                            <img src="../../assets/myfavicon.png" alt="Company Logo" style="width: 150px;">
+                            <img src="${job.author.userdata.profilePictureUrl}" alt="Company Logo" style="width: 150px;">
                         </td>
                     </tr>
                     <tr>
