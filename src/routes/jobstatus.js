@@ -20,14 +20,19 @@ jobstatusRoute.get("/applied", jobstatusController.getJobWithStartus);
 jobstatusRoute.get("/checkUserApplied", jobstatusController.checkUserApplied);
 jobstatusRoute.get("/candidate/:id", jobstatusController.getCandidateOfJob);
 jobstatusRoute.get("/:id", jobstatusController.getJobStatusByAuthor);
+jobstatusRoute.get('/details/:jobStatusId', jobstatusController.getJobstatusDetails);
 jobstatusRoute.post("/", verifyAuth, upload.single('cv'), jobstatusController.createJobStatus);
 jobstatusRoute.put("/:id", verifyAuth, jobstatusController.updateJobStatus);
 jobstatusRoute.delete("/:id", verifyAuth, jobstatusController.deleteJobStatus);
 jobstatusRoute.put("/hire/:id", verifyAuth, jobstatusController.hireCandidate);
 jobstatusRoute.put("/deny/:id", verifyAuth, jobstatusController.denyCandidate);
+jobstatusRoute.post("/sendrequest", verifyAuth, jobstatusController.requestConfirmation); // For scheduling interviews
+jobstatusRoute.get("/confirmInterview/:token", jobstatusController.confirmRequest); // For confirming interviews via token
+jobstatusRoute.get("/interviewcandidates/:id", jobstatusController.getInterviewCandidates);
+jobstatusRoute.post("/schedule", jobstatusController.scheduleInterview);
+jobstatusRoute.get("/interview/accept/:jobStatusId", jobstatusController.acceptInterview);
+jobstatusRoute.post("/interview/reschedule/:jobStatusId", jobstatusController.rescheduleInterview);
+jobstatusRoute.get('/interview-confirmed/:id', jobstatusController.getInterviewConfirmedCandidates);
 
-// New routes for interview scheduling and confirmation
-jobstatusRoute.post("/scheduleInterview", verifyAuth, jobstatusController.scheduleInterview); // For scheduling interviews
-jobstatusRoute.get("/confirmInterview/:token", jobstatusController.confirmInterview); // For confirming interviews via token
 
 module.exports = jobstatusRoute;
