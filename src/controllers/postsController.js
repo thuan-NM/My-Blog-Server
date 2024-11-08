@@ -25,7 +25,7 @@ const preprocessLocation = (location) => {
     return reconstructedAddress.substring(0, 256);
 };
 
-const getCoordinates = async (address) => {
+const getCoordinates = async(address) => {
     if (!address) {
         console.error('No address provided for geocoding.');
         return null;
@@ -93,11 +93,12 @@ const getPosts = async(req, res) => {
     }
 };
 
-const getFilterPost = async (req, res) => {
+const getFilterPost = async(req, res) => {
     try {
         const filter = req.body;
         const query = {};
         let sortOption = { createdAt: -1 }; // Default sort by newest
+        let filteredPosts = []; // Khởi tạo filteredPosts để tránh lỗi ReferenceError
 
         // 1. Filter by skills (case-insensitive) with optimized regex
         if (filter.skills && Array.isArray(filter.skills) && filter.skills.length > 0 && filter.skills[0].trim() !== "") {
@@ -184,20 +185,11 @@ const getFilterPost = async (req, res) => {
                 ...post,
                 totalReactions: reactionsMap[post._id.toString()] || 0
             })).sort((a, b) => b.totalReactions - a.totalReactions).slice(0, 20); // Limit to 20
-
-            const totalCount = filteredPosts.length;
-
-            res.status(200).json({
-                message: "Get post list successful",
-                data: filteredPosts,
-                totalCount: totalCount,
-                isSuccess: true
-            });
-            return;
+        } else {
+            // 8. Limit the number of posts returned
+            filteredPosts = await mongoQuery.lean();
         }
 
-        // 8. Limit the number of posts returned
-        const filteredPosts = await mongoQuery.lean();
         const totalCount = filteredPosts.length;
 
         res.status(200).json({
@@ -215,6 +207,7 @@ const getFilterPost = async (req, res) => {
         });
     }
 };
+
 
 
 // GET post by id
@@ -318,7 +311,7 @@ const getPostByCompanyId = async(req, res) => {
 };
 
 // CREATE new post
-const createPost = async (req, res) => {
+const createPost = async(req, res) => {
     try {
         const { title, description, skills, price, workType, location } = req.body;
 
