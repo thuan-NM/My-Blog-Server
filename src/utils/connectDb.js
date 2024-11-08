@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+require('dotenv').config();
 
 // Import các Model
 const Post = require('../models/Post');
@@ -29,12 +30,11 @@ const db = {
     Follow
 };
 
-const MONGODB_URL = "mongodb+srv://nguyenminhthuan2003st:112233zZ%40@cluster0.iblshhh.mongodb.net/my-blog";
 
 async function connectDb() {
     try {
         console.log("Connect to database successfully!!");
-        await mongoose.connect(MONGODB_URL, {
+        await mongoose.connect(process.env.MONGO_URI, {
             // useNewUrlParser: true,
             // useUnifiedTopology: true,
             autoIndex: true,
