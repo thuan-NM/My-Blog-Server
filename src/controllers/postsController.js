@@ -153,7 +153,7 @@ const getFilterPost = async(req, res) => {
                         type: "Point",
                         coordinates: locationData.coordinates
                     },
-                    $maxDistance: 20000 // 20 km, bạn có thể điều chỉnh tùy ý
+                    $maxDistance: 30000 // 20 km, bạn có thể điều chỉnh tùy ý
                 }
             };
         }

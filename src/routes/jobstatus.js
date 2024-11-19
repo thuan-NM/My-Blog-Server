@@ -30,9 +30,9 @@ jobstatusRoute.post("/sendrequest", verifyAuth, jobstatusController.requestConfi
 jobstatusRoute.get("/confirmInterview/:token", jobstatusController.confirmRequest); // For confirming interviews via token
 jobstatusRoute.get("/interviewcandidates/:id", jobstatusController.getInterviewCandidates);
 jobstatusRoute.post("/schedule", jobstatusController.scheduleInterview);
-jobstatusRoute.get("/interview/accept/:jobStatusId", jobstatusController.acceptInterview);
+jobstatusRoute.post("/interview/accept/:jobStatusId", jobstatusController.acceptInterview);
 jobstatusRoute.post("/interview/reschedule/:jobStatusId", jobstatusController.rescheduleInterview);
 jobstatusRoute.get('/interview-confirmed/:id', jobstatusController.getInterviewConfirmedCandidates);
-
+jobstatusRoute.get('/status/:id/:status', jobstatusController.getCandidateWithStatus);
 
 module.exports = jobstatusRoute;

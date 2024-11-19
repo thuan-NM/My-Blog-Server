@@ -8,7 +8,7 @@ require('dotenv').config();
 // Import User Model từ Mongoose
 const User = require("../models/User");
 
-const sendVerificationEmail = async(user, token) => {
+const sendVerificationEmail = async (user, token) => {
     const transporter = nodemailer.createTransport({
         service: 'Gmail',
         auth: {
@@ -18,18 +18,52 @@ const sendVerificationEmail = async(user, token) => {
     });
 
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"Meow Blog" <${process.env.EMAIL_USER}>`,
         to: user.email,
-        subject: 'Email Verification',
-        html: `<p>Xin chào ${user.username},</p>
-               <p>Để xác minh email của bạn, hãy nhấp vào liên kết sau:</p>
-               <a href="http://localhost:3000/auth/verifyemail/user?token=${token}">Xác minh email của tôi</a>`,
+        subject: `Xác Minh Email - ${candidate.firstName} ${candidate.lastName}`,
+        html: `
+            <div style="background-color: #f9f9f9; padding: 20px; font-family: Arial, sans-serif;">
+                <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
+                    <tr>
+                        <td style="text-align: center; padding-bottom: 20px;">
+                            <img src="https://res.cloudinary.com/dca8kjdlq/image/upload/v1731754143/myfavicon_dokhmh.png" alt="Logo Công ty" style="width: 80px; border-radius: 50%; margin-bottom: 20px;"/>
+                            <h2 style="color: #2d3748; margin-bottom: 10px;">Xin chào ${user.username},</h2>
+                            <p style="color: #666666; margin-top: 5px;">Chúc mừng bạn đã đăng ký thành công!</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                            <p>Để xác minh email của bạn và hoàn tất quy trình đăng ký, vui lòng nhấp vào liên kết dưới đây:</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center; padding: 20px;">
+                            <a href="http://localhost:3000/auth/verifyemail/user?token=${token}"
+                               style="background-color: #4caf50; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 50px; font-size: 18px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); display: inline-block;">
+                               Xác minh email của tôi
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top: 20px; font-size: 14px; color: #888888; text-align: center; border-top: 1px solid #eeeeee;">
+                            <p>Nếu bạn không tự yêu cầu xác minh này, vui lòng bỏ qua email này.</p>
+                            <p>Cảm ơn bạn đã tin tưởng sử dụng dịch vụ của chúng tôi.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center; font-size: 12px; color: #aaaaaa; padding-top: 20px;">
+                            <p>© ${new Date().getFullYear()} Company. All rights reserved.</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        `,
     };
 
     await transporter.sendMail(mailOptions);
 };
 
-const register = async(req, res) => {
+const register = async (req, res) => {
     try {
         const { username, email, password, confirmpassword, firstName, lastName, country } = req.body;
 
@@ -77,7 +111,7 @@ const register = async(req, res) => {
     }
 };
 
-const login = async(req, res) => {
+const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -114,7 +148,7 @@ const login = async(req, res) => {
 };
 
 
-const loginWithGoogle = async(req, res) => {
+const loginWithGoogle = async (req, res) => {
     const idToken = req.body.id;
 
     try {
@@ -170,7 +204,7 @@ const loginWithGoogle = async(req, res) => {
     }
 };
 
-const changePassword = async(req, res) => {
+const changePassword = async (req, res) => {
     const userId = req.params.id;
     const { currentPassword, newPassword } = req.body;
 
@@ -202,7 +236,7 @@ const changePassword = async(req, res) => {
     }
 };
 
-const verifyEmail = async(req, res) => {
+const verifyEmail = async (req, res) => {
     const { token } = req.query;
 
     try {

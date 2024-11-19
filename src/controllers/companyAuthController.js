@@ -5,7 +5,7 @@ const Company = require("../models/Company"); // Import the Company model
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const sendVerificationEmail = async(user, token) => {
+const sendVerificationEmail = async (user, token) => {
     const transporter = nodemailer.createTransport({
         service: 'Gmail',
         auth: {
@@ -13,20 +13,53 @@ const sendVerificationEmail = async(user, token) => {
             pass: process.env.EMAIL_PASS,
         },
     });
-
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"Meow Blog" <${process.env.EMAIL_USER}>`,
         to: user.email,
-        subject: 'Email Verification',
-        html: `<p>Xin chào ${user.companyname},</p>
-             <p>Để xác minh email của bạn, hãy nhấp vào liên kết sau:</p>
-             <a href="http://localhost:3000/auth/verifyemail/company?token=${token}">Xác minh email của tôi</a>`,
+        subject: `Xác Minh Email - ${user.companyname}`,
+        html: `
+            <div style="background-color: #f9f9f9; padding: 20px; font-family: Arial, sans-serif;">
+                <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
+                    <tr>
+                        <td style="text-align: center; padding-bottom: 20px;">
+                            <img src="https://res.cloudinary.com/dca8kjdlq/image/upload/v1731754143/myfavicon_dokhmh.png" alt="Logo Công ty" style="width: 80px; border-radius: 50%; margin-bottom: 20px;"/>
+                            <h2 style="color: #2d3748; margin-bottom: 10px;">Xin chào ${user.companyname},</h2>
+                            <p style="color: #666666; margin-top: 5px;">Chúc mừng bạn đã đăng ký thành công!</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                            <p>Để xác minh email của bạn và hoàn tất quy trình đăng ký, vui lòng nhấp vào liên kết dưới đây:</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center; padding: 20px;">
+                            <a href="http://localhost:3000/auth/verifyemail/company?token=${token}"
+                               style="background-color: #4caf50; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 50px; font-size: 18px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); display: inline-block;">
+                               Xác minh email của tôi
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top: 20px; font-size: 14px; color: #888888; text-align: center; border-top: 1px solid #eeeeee;">
+                            <p>Nếu bạn không tự yêu cầu xác minh này, vui lòng bỏ qua email này.</p>
+                            <p>Cảm ơn bạn đã tin tưởng sử dụng dịch vụ của chúng tôi.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center; font-size: 12px; color: #aaaaaa; padding-top: 20px;">
+                            <p>© ${new Date().getFullYear()} Company. All rights reserved.</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        `,
     };
 
     await transporter.sendMail(mailOptions);
 };
 
-const companyRegister = async(req, res) => {
+const companyRegister = async (req, res) => {
     try {
         const company = req.body;
 
@@ -64,35 +97,38 @@ const companyRegister = async(req, res) => {
     }
 };
 
-const companyLogin = async(req, res) => {
+const companyLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
 
         const company = await Company.findOne({ email });
         if (!company) {
-            return res.status(401).json({ message: "Invalid credentials", isSuccess: 0 });
+            return res.status(401).json({ message: "Không tồn tại email", isSuccess: 0 });
+        }
+        if (!company.isVerified) {
+            return res.status(401).json({ message: "Email chưa được xác thực, vui lòng kiểm tra mail của bạn để xác thực!" });
         }
 
         const isPasswordMatch = await bcrypt.compare(password, company.password);
         if (!isPasswordMatch) {
-            return res.status(401).json({ message: "Invalid credentials", isSuccess: 0 });
+            return res.status(401).json({ message: "Sai mật khẩu", isSuccess: 0 });
         }
 
         const token = jwt.sign({ companyId: company._id }, process.env.JWT_SECRET, { expiresIn: "24h" });
 
         res.json({
-            message: 'Login successful',
+            message: 'Đăng nhập thành công',
             token,
             company,
             isSuccess: 1,
         });
     } catch (err) {
         console.error('Error during login:', err);
-        res.status(500).json({ message: 'Failed to log in', isSuccess: 0 });
+        res.status(500).json({ message: 'Đăng nhập thất bại', isSuccess: 0 });
     }
 };
 
-const companyChangePassword = async(req, res) => {
+const companyChangePassword = async (req, res) => {
     const companyId = req.params.id;
     const { currentPassword, newPassword } = req.body;
 
@@ -120,7 +156,7 @@ const companyChangePassword = async(req, res) => {
     }
 };
 
-const verifyEmail = async(req, res) => {
+const verifyEmail = async (req, res) => {
     const { token } = req.query;
 
     try {
