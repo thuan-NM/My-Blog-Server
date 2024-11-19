@@ -73,8 +73,12 @@ const getCoordinates = async(address) => {
 // GET posts
 const getPosts = async(req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1; // Trang hiện tại (mặc định là 1)
+        const pageSize = parseInt(req.query.pageSize) || 20; // Số bài viết mỗi trang (mặc định là 20)
+        const skip = (page - 1) * pageSize; // Tính số bài viết cần bỏ qua
+
         const [posts, totalCount] = await Promise.all([
-            Post.find({}).sort({ createdAt: -1 }).limit(20),
+            Post.find({}).sort({ createdAt: -1 }).skip(skip).limit(pageSize),
             Post.countDocuments({}),
         ]);
 
@@ -82,6 +86,9 @@ const getPosts = async(req, res) => {
             message: "Get post list successful",
             data: posts,
             totalCount,
+            page,
+            pageSize,
+            totalPages: Math.ceil(totalCount / pageSize),
             isSuccess: true,
         });
     } catch (error) {
@@ -93,12 +100,14 @@ const getPosts = async(req, res) => {
     }
 };
 
-const getFilterPost = async(req, res) => {
+
+const getFilterPost = async (req, res) => {
     try {
         const filter = req.body;
+        const page = parseInt(filter.page) || 1;
+        const pageSize = parseInt(filter.pageSize) || 20;
+        const skip = (page - 1) * pageSize;
         const query = {};
-        let sortOption = { createdAt: -1 }; // Default sort by newest
-        let filteredPosts = []; // Khởi tạo filteredPosts để tránh lỗi ReferenceError
 
         // 1. Filter by skills (case-insensitive) with optimized regex
         if (filter.skills && Array.isArray(filter.skills) && filter.skills.length > 0 && filter.skills[0].trim() !== "") {
@@ -138,65 +147,101 @@ const getFilterPost = async(req, res) => {
             query["author.userdata.companyname"] = { $regex: new RegExp(filter.companyName.trim(), 'i') };
         }
 
-        // 5. If location filter is provided, add $near to the query
+        // 5. If location filter is provided, add $geoWithin to the query
         if (filter.location && filter.location.trim() !== "") {
-            // Get user's coordinates from the provided location
-            const locationData = await getCoordinates(filter.location); // { coordinates: [lng, lat], address: "..." }
+            // Thử lấy tọa độ ban đầu
+            let locationData = await getCoordinates(filter.location);
 
-            if (!locationData || !Array.isArray(locationData.coordinates) || locationData.coordinates.length !== 2) {
-                throw new Error("Invalid coordinates received from geocoding service for user's location.");
+            if (!locationData) {
+                // Nếu thất bại, tiến hành tiền xử lý địa chỉ
+                const preprocessedAddress = preprocessLocation(filter.location);
+                console.log(`Preprocessed Address: ${preprocessedAddress}`);
+
+                // Thử lại lấy tọa độ với địa chỉ đã tiền xử lý
+                locationData = await getCoordinates(preprocessedAddress);
             }
 
+            if (!locationData) {
+                // Nếu vẫn thất bại, trả về lỗi
+                throw new Error("Invalid location provided and preprocessing failed to fetch coordinates.");
+            }
+
+            // Nếu thành công, thêm điều kiện $geoWithin vào truy vấn
+            const maxDistanceInMeters = 20000; // 20 km
+            const earthRadiusInMeters = 6378137; // Bán kính Trái Đất theo Mapbox
+            const radiusInRadians = maxDistanceInMeters / earthRadiusInMeters;
+
             query.location = {
-                $near: {
-                    $geometry: {
-                        type: "Point",
-                        coordinates: locationData.coordinates
-                    },
-                    $maxDistance: 20000 // 20 km, bạn có thể điều chỉnh tùy ý
+                $geoWithin: {
+                    $centerSphere: [
+                        locationData.coordinates, // [longitude, latitude]
+                        radiusInRadians
+                    ]
                 }
             };
         }
 
-        // 6. Apply initial filters to get a set of posts
-        let mongoQuery = Post.find(query).sort(sortOption).limit(100); // Adjust limit as needed
+        // 6. Determine sort option
+        let sortOption = { createdAt: -1 }; // Default sort by newest
 
-        // 7. If sorting by most likes, adjust sorting
         if (filter.sortBy === "mostLikes") {
-            // Get the reaction counts for the filtered posts
-            const postIds = await Post.find(query).select('_id').limit(100).lean();
-            const ids = postIds.map(post => post._id);
+            // Sử dụng aggregation pipeline để sắp xếp theo số lượng phản ứng
+            const pipeline = [
+                { $match: query },
+                {
+                    $lookup: {
+                        from: 'reactions',
+                        localField: '_id',
+                        foreignField: 'postId',
+                        as: 'reactions'
+                    }
+                },
+                {
+                    $addFields: {
+                        totalReactions: { $size: '$reactions' }
+                    }
+                },
+                {
+                    $sort: { totalReactions: -1 }
+                },
+                {
+                    $skip: skip
+                },
+                {
+                    $limit: pageSize
+                }
+            ];
 
-            const reactions = await Reaction.aggregate([
-                { $match: { postId: { $in: ids } } },
-                { $group: { _id: "$postId", totalReactions: { $sum: 1 } } },
-            ]);
+            const aggregatedPosts = await Post.aggregate(pipeline).exec();
 
-            // Create a mapping of postId to totalReactions
-            const reactionsMap = {};
-            reactions.forEach(item => {
-                reactionsMap[item._id.toString()] = item.totalReactions;
+            const totalCount = await Post.countDocuments(query);
+
+            res.status(200).json({
+                message: "Get post list successful",
+                data: aggregatedPosts,
+                totalCount: totalCount,
+                page,
+                pageSize,
+                totalPages: Math.ceil(totalCount / pageSize),
+                isSuccess: true,
             });
-
-            // Fetch posts and sort them based on totalReactions
-            const posts = await mongoQuery.lean(); // Get lean documents
-
-            filteredPosts = posts.map(post => ({
-                ...post,
-                totalReactions: reactionsMap[post._id.toString()] || 0
-            })).sort((a, b) => b.totalReactions - a.totalReactions).slice(0, 20); // Limit to 20
-        } else {
-            // 8. Limit the number of posts returned
-            filteredPosts = await mongoQuery.lean();
+            return;
         }
 
-        const totalCount = filteredPosts.length;
+        // 7. For other sort options (e.g., newest), use regular find
+        const [posts, totalCount] = await Promise.all([
+            Post.find(query).sort(sortOption).skip(skip).limit(pageSize),
+            Post.countDocuments(query),
+        ]);
 
         res.status(200).json({
             message: "Get post list successful",
-            data: filteredPosts,
-            totalCount: totalCount,
-            isSuccess: true
+            data: posts,
+            totalCount,
+            page,
+            pageSize,
+            totalPages: Math.ceil(totalCount / pageSize),
+            isSuccess: true,
         });
     } catch (error) {
         console.error('Error in getFilterPost:', error);
@@ -207,8 +252,6 @@ const getFilterPost = async(req, res) => {
         });
     }
 };
-
-
 
 // GET post by id
 const getPostById = async(req, res) => {
@@ -311,7 +354,7 @@ const getPostByCompanyId = async(req, res) => {
 };
 
 // CREATE new post
-const createPost = async(req, res) => {
+const createPost = async (req, res) => {
     try {
         const { title, description, skills, price, workType, location } = req.body;
 
@@ -322,16 +365,38 @@ const createPost = async(req, res) => {
             });
         }
 
-        const companyId = req.body.author.id; // Assuming the user's ID is available in req.user
+        // Lấy companyId từ req.user.id thay vì từ req.body.author.id để đảm bảo tính bảo mật
+        const companyId = req.user.id;
         const company = await Company.findById(companyId).select('-password -friend -friendRequests -username');
-        const uppercaseSkills = skills.map(skill => skill.toUpperCase());
 
-        // Get coordinates from the address
-        const locationData = await getCoordinates(location);
+        if (!company) {
+            return res.status(404).json({
+                message: "Company not found",
+                isSuccess: false,
+            });
+        }
+
+        // Xử lý skills để đảm bảo là mảng và chuyển thành uppercase
+        const uppercaseSkills = Array.isArray(skills)
+            ? skills.map(skill => skill.trim().toUpperCase())
+            : skills.split(',').map(skill => skill.trim().toUpperCase());
+
+        // Thử lấy tọa độ từ địa chỉ ban đầu
+        let locationData = await getCoordinates(location);
 
         if (!locationData) {
+            // Nếu thất bại, tiến hành tiền xử lý địa chỉ
+            const preprocessedAddress = preprocessLocation(location);
+            console.log(`Preprocessed Address: ${preprocessedAddress}`);
+
+            // Thử lại lấy tọa độ với địa chỉ đã tiền xử lý
+            locationData = await getCoordinates(preprocessedAddress);
+        }
+
+        if (!locationData) {
+            // Nếu vẫn thất bại, trả về lỗi
             return res.status(400).json({
-                message: "Invalid location provided",
+                message: "Invalid location provided and preprocessing failed to fetch coordinates.",
                 isSuccess: false,
             });
         }
@@ -349,7 +414,7 @@ const createPost = async(req, res) => {
             location: {
                 type: 'Point',
                 coordinates: locationData.coordinates, // [longitude, latitude]
-                address: location,
+                address: locationData.address || location,
             },
         });
 
@@ -369,7 +434,6 @@ const createPost = async(req, res) => {
         });
     }
 };
-
 
 // UPDATE post
 const updatePost = async(req, res) => {
