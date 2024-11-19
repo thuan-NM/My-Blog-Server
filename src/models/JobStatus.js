@@ -39,6 +39,10 @@ const jobStatusSchema = new Schema({
         required: false,
         default: "",
     },
+    emailReminderSent: {
+        type: Boolean,
+        default: false
+    }
 }, {
     timestamps: true, // Automatically add createdAt and updatedAt fields
 });

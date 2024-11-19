@@ -8,7 +8,7 @@ const crypto = require('crypto');
 const Company = require('../models/Company');
 const Room = require('../models/Room');
 
-const getJobStatus = async(req, res) => {
+const getJobStatus = async (req, res) => {
     try {
         const { postid, userid } = req.body;
         if (!mongoose.Types.ObjectId.isValid(postid) || !mongoose.Types.ObjectId.isValid(userid)) {
@@ -41,7 +41,7 @@ const getJobStatus = async(req, res) => {
     }
 };
 
-const getJobstatusDetails = async(req, res) => {
+const getJobstatusDetails = async (req, res) => {
     try {
         const { jobStatusId } = req.params;
 
@@ -55,6 +55,7 @@ const getJobstatusDetails = async(req, res) => {
         res.status(200).json({
             companyid: jobStatus.companyid,
             userid: jobStatus.userid,
+            date: jobStatus.interviewDate
         });
     } catch (error) {
         console.error('Error retrieving job status:', error);
@@ -62,7 +63,7 @@ const getJobstatusDetails = async(req, res) => {
     }
 };
 
-const updateJobStatus = async(req, res) => {
+const updateJobStatus = async (req, res) => {
     const { status, candidateInfo } = req.body;
     try {
         const id = req.params.id;
@@ -98,7 +99,7 @@ const updateJobStatus = async(req, res) => {
     }
 };
 
-const createJobStatus = async(req, res) => {
+const createJobStatus = async (req, res) => {
     try {
         console.log('Creating job status')
         if (!req.file) {
@@ -133,7 +134,7 @@ const createJobStatus = async(req, res) => {
     }
 };
 
-const getJobStatusByAuthor = async(req, res) => {
+const getJobStatusByAuthor = async (req, res) => {
     try {
         const authorid = req.params.id;
 
@@ -149,7 +150,7 @@ const getJobStatusByAuthor = async(req, res) => {
         const posts = await Post.find({ "author.id": authorid });
 
         // Use Promise.all to optimize the query process for each post
-        const updatedPosts = await Promise.all(posts.map(async(post) => {
+        const updatedPosts = await Promise.all(posts.map(async (post) => {
             const jobStatusCount = await JobStatus.countDocuments({
                 postid: post._id,
                 status: "Applied",
@@ -177,8 +178,8 @@ const getJobStatusByAuthor = async(req, res) => {
     }
 };
 
-const hireCandidate = async(req, res) => {
-    console.log(req)
+const hireCandidate = async (req, res) => {
+    console.log(req.body)
     const { postid } = req.body;
     const userid = req.params.id;
     if (!mongoose.Types.ObjectId.isValid(userid) || !mongoose.Types.ObjectId.isValid(postid)) {
@@ -212,7 +213,7 @@ const hireCandidate = async(req, res) => {
     }
 };
 
-const denyCandidate = async(req, res) => {
+const denyCandidate = async (req, res) => {
     const { postid } = req.body;
     const userid = req.params.id;
     if (!mongoose.Types.ObjectId.isValid(userid) || !mongoose.Types.ObjectId.isValid(postid)) {
@@ -246,7 +247,7 @@ const denyCandidate = async(req, res) => {
     }
 };
 
-const getJobWithStartus = async(req, res) => {
+const getJobWithStartus = async (req, res) => {
     try {
         const { userId, statusdata } = req.query;
         if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -283,7 +284,7 @@ const getJobWithStartus = async(req, res) => {
     }
 };
 
-const getCandidateOfJob = async(req, res) => {
+const getCandidateOfJob = async (req, res) => {
     try {
         const postId = req.params.id
         const jobStatusItems = await JobStatus.find({
@@ -292,7 +293,7 @@ const getCandidateOfJob = async(req, res) => {
         });
 
         // Prepare array to store job applications details
-        const userapply = await Promise.all(jobStatusItems.map(async(job) => {
+        const userapply = await Promise.all(jobStatusItems.map(async (job) => {
             const user = await User.findById(job.userid);
             return {
                 user,
@@ -316,7 +317,7 @@ const getCandidateOfJob = async(req, res) => {
     }
 }
 
-const deleteJobStatus = async(req, res) => {
+const deleteJobStatus = async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({
@@ -349,7 +350,7 @@ const deleteJobStatus = async(req, res) => {
     }
 };
 
-const checkUserApplied = async(req, res) => {
+const checkUserApplied = async (req, res) => {
     const { postid, userid } = req.query;
     if (!mongoose.Types.ObjectId.isValid(postid) || !mongoose.Types.ObjectId.isValid(userid)) {
         return res.status(400).json({
@@ -378,9 +379,8 @@ const checkUserApplied = async(req, res) => {
     }
 };
 
-const requestConfirmation = async(req, res) => {
+const requestConfirmation = async (req, res) => {
     const { postId, candidateId } = req.body;
-    console.log(req.body)
     if (!mongoose.Types.ObjectId.isValid(postId) || !mongoose.Types.ObjectId.isValid(candidateId)) {
         return res.status(400).json({
             message: 'Invalid post ID or candidate ID format',
@@ -416,7 +416,7 @@ const requestConfirmation = async(req, res) => {
 
         // Create the confirmation link
         const confirmationUrl = `${process.env.FRONTEND_URL}/sendrequest/confirm/${confirmationToken}`;
-
+        console.log(candidate);
         // Send the confirmation request email
         const transporter = nodemailer.createTransport({
             service: 'Gmail',
@@ -427,40 +427,45 @@ const requestConfirmation = async(req, res) => {
         });
 
         const mailOptions = {
-            from: `${job.author.userdata.companyname} <${process.env.EMAIL_USER}>`,
+            from: `"Meow Blog" <${process.env.EMAIL_USER}>`,
             to: candidate.email,
-            subject: 'Interview Confirmation Request',
+            subject: `Yêu Cầu Xác Nhận Phỏng Vấn - ${candidate.firstName} ${candidate.lastName}`,
             html: `
-            <div style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
-                <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: white; padding: 20px; border-radius: 10px;">
-                    <tr>
-                        <td style="text-align: center; padding-bottom: 20px;">
-                            <img src="${encodeURI(job.author.userdata.profilePictureUrl)}" alt="Company Logo" style="width: 150px;">
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="font-size: 24px; font-weight: bold; text-align: center; color: #333;">Interview Confirmation Request</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 20px; font-size: 16px; line-height: 1.6; color: #555;">
-                            <p>Dear ${candidate.firstName},</p>
-                            <p>You have received a request to confirm your interest in an interview for the position at <strong>${job.author.userdata.companyname}</strong>.</p>
-                            <p>Please confirm your participation by clicking the button below within 2 days:</p>
-                            <p style="text-align: center;">
-                                <a href="${confirmationUrl}" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Confirm Interview</a>
-                            </p>
-                            <p>If you do not confirm within the specified time, the interview request will expire.</p>
-                            <p>Best regards,</p>
-                            <p><strong>${job.author.userdata.companyname} Hiring Team</strong></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="text-align: center; font-size: 12px; color: #999; padding-top: 20px; border-top: 1px solid #ddd;">
-                            <p>© ${new Date().getFullYear()} ${job.author.userdata.companyname}. All rights reserved.</p>
-                        </td>
-                    </tr>
-                </table>
-            </div>`,
+                <div style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
+                    <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
+                        <tr>
+                            <td style="text-align: center; padding-bottom: 20px;">
+                                <img src="https://res.cloudinary.com/dca8kjdlq/image/upload/v1731754143/myfavicon_dokhmh.png" alt="Logo Công ty" style="width: 150px; margin-bottom: 20px;"/>
+                                <h2 style="color: #333333; margin-bottom: 0;">Yêu Cầu Xác Nhận Phỏng Vấn</h2>
+                                <p style="color: #666666; margin-top: 5px;">Bạn có một yêu cầu xác nhận phỏng vấn</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                                <p>Xin chào ${candidate.firstName},</p>
+                                <p>Bạn đã nhận được yêu cầu xác nhận tham gia buổi phỏng vấn cho vị trí tại <strong>${job.author.userdata.companyname}</strong>.</p>
+                                <p>Vui lòng xác nhận tham gia phỏng vấn của bạn bằng cách nhấn vào nút bên trước 2 ngày tới:</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center; padding: 20px;">
+                                <a href="${confirmationUrl}" style="background-color: #4CAF50; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Xác Nhận Phỏng Vấn</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-top: 20px; font-size: 14px; color: #888888; text-align: center; border-top: 1px solid #eeeeee;">
+                                <p>Nếu bạn không xác nhận trong thời gian quy định, yêu cầu phỏng vấn sẽ hết hạn.</p>
+                                <p>Trân trọng,<br><strong>Đội Ngũ Tuyển Dụng ${job.author.userdata.companyname}</strong></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center; font-size: 12px; color: #aaaaaa; padding-top: 20px;">
+                                <p>© ${new Date().getFullYear()} ${job.author.userdata.companyname}. Mọi quyền được bảo lưu.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            `
         };
 
         await transporter.sendMail(mailOptions);
@@ -482,7 +487,7 @@ const requestConfirmation = async(req, res) => {
 
 
 // Endpoint to handle interview confirmation
-const confirmRequest = async(req, res) => {
+const confirmRequest = async (req, res) => {
     const { token } = req.params;
     try {
         const jobStatus = await JobStatus.findOne({ confirmationToken: token });
@@ -511,7 +516,7 @@ const confirmRequest = async(req, res) => {
     }
 };
 
-const getInterviewCandidates = async(req, res) => {
+const getInterviewCandidates = async (req, res) => {
     try {
         const authorId = req.params.id; // Assuming this is the author's user ID
 
@@ -552,7 +557,7 @@ const getInterviewCandidates = async(req, res) => {
         }
 
         // Fetch detailed candidate information
-        const candidates = await Promise.all(jobStatusItems.map(async(jobStatus) => {
+        const candidates = await Promise.all(jobStatusItems.map(async (jobStatus) => {
             const user = await User.findById(jobStatus.userid, "firstName lastName email");
             const post = posts.find(p => p._id.equals(jobStatus.postid));
             return {
@@ -583,7 +588,7 @@ const getInterviewCandidates = async(req, res) => {
 
 
 // Function to schedule an interview
-const scheduleInterview = async(req, res) => {
+const scheduleInterview = async (req, res) => {
     const { postId, candidateId, interviewDate } = req.body;
 
     try {
@@ -615,7 +620,6 @@ const scheduleInterview = async(req, res) => {
         // Tạo đường link chấp nhận và dời lịch
         const acceptUrl = `${process.env.FRONTEND_URL}/interview/accept/${jobStatus._id}`;
         const rescheduleUrl = `${process.env.FRONTEND_URL}/interview/reschedule/${jobStatus._id}`;
-
         // Thiết lập gửi email
         const transporter = nodemailer.createTransport({
             service: 'Gmail',
@@ -626,36 +630,37 @@ const scheduleInterview = async(req, res) => {
         });
 
         const mailOptions = {
-            from: `"Company" <${process.env.EMAIL_USER}>`,
+            from: `"Meow Blog" <${process.env.EMAIL_USER}>`,
             to: candidate.email,
-            subject: 'Interview Schedule Notification',
+            subject: `Thông Báo Lịch Phỏng Vấn - ${candidate.firstName} ${candidate.lastName}`,
             html: `
                 <div style="background-color: #f9f9f9; padding: 20px; font-family: Arial, sans-serif;">
                     <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
                         <tr>
                             <td style="text-align: center; padding-bottom: 20px;">
-                                <h2 style="color: #333333; margin-bottom: 0;">Interview Schedule Notification</h2>
-                                <p style="color: #666666; margin-top: 5px;">You have a new interview scheduled</p>
+                                <img src="https://res.cloudinary.com/dca8kjdlq/image/upload/v1731754143/myfavicon_dokhmh.png" alt="Logo Công ty" style="width: 80px; border-radius: 50%; margin-bottom: 20px;"/>
+                                <h2 style="color: #333333; margin-bottom: 0;">Thông Báo Lịch Phỏng Vấn</h2>
+                                <p style="color: #666666; margin-top: 5px;">Bạn có một buổi phỏng vấn mới được sắp xếp</p>
                             </td>
                         </tr>
                         <tr>
                             <td style="padding: 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
-                                <p>Dear ${candidate.firstName},</p>
-                                <p>We are pleased to inform you that you have been scheduled for an interview. Below are the details:</p>
-                                <p><strong>Date and Time:</strong> ${new Date(interviewDate).toLocaleString()}</p>
-                                <p>Please confirm your participation or request a reschedule using one of the options below:</p>
+                                <p>Xin chào ${candidate.firstName},</p>
+                                <p>Chúng tôi rất vui thông báo rằng bạn đã được sắp xếp lịch phỏng vấn. Thông tin chi tiết như sau:</p>
+                                <p><strong>Ngày và Giờ:</strong> ${new Date(interviewDate).toLocaleString()}</p>
+                                <p>Vui lòng xác nhận tham gia hoặc yêu cầu sắp xếp lại bằng cách chọn một trong các lựa chọn dưới đây:</p>
                             </td>
                         </tr>
                         <tr>
                             <td style="text-align: center; padding: 20px;">
-                                <a href="${acceptUrl}" style="background-color: #28a745; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; margin-right: 10px; display: inline-block;">Accept Interview</a>
-                                <a href="${rescheduleUrl}" style="background-color: #ff9800; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Reschedule Interview</a>
+                                <a href="${acceptUrl}" style="background-color: #28a745; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; margin-right: 10px; display: inline-block;">Chấp Nhận Phỏng Vấn</a>
+                                <a href="${rescheduleUrl}" style="background-color: #ff9800; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Yêu Cầu Sắp Xếp Lại</a>
                             </td>
                         </tr>
                         <tr>
                             <td style="padding-top: 20px; font-size: 14px; color: #888888; text-align: center; border-top: 1px solid #eeeeee;">
-                                <p>If you have any questions, feel free to contact us at support@company.com.</p>
-                                <p>Best regards,<br><strong>Company Hiring Team</strong></p>
+                                <p>Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi qua email ${process.env.EMAIL_USER}.</p>
+                                <p>Trân trọng,<br><strong>Đội Ngũ Tuyển Dụng Công Ty</strong></p>
                             </td>
                         </tr>
                         <tr>
@@ -684,7 +689,8 @@ const scheduleInterview = async(req, res) => {
         });
     }
 };
-const acceptInterview = async(req, res) => {
+const acceptInterview = async (req, res) => {
+    const { data } = req.body
     const { jobStatusId } = req.params;
     console.log(jobStatusId);
     try {
@@ -712,7 +718,7 @@ const acceptInterview = async(req, res) => {
         const company = await Company.findById(jobStatus.companyid);
 
         // Tạo đường link gọi video
-        const videoCallUrl = `http://localhost:4000/call/${candidate._id}/${company._id}`;
+        const videoCallUrl = `http://localhost:5173/call/${candidate._id}/${company._id}`;
 
         // Gửi email xác nhận
         const transporter = nodemailer.createTransport({
@@ -724,19 +730,53 @@ const acceptInterview = async(req, res) => {
         });
 
         const mailOptions = {
-            from: `"Company" <${process.env.EMAIL_USER}>`,
+            from: `"Meow Blog" <${process.env.EMAIL_USER}>`,
             to: candidate.email,
-            subject: 'Interview Confirmation',
+            subject: `Xác Nhận Tham Gia Phỏng Vấn - ${candidate.firstName} ${candidate.lastName}`,
             html: `
                 <div style="background-color: #f9f9f9; padding: 20px; font-family: Arial, sans-serif;">
-                    <h2 style="color: #333333;">Interview Confirmation</h2>
-                    <p>Dear ${candidate.firstName},</p>
-                    <p>You have successfully confirmed the interview. Below are the details:</p>
-                    <p><strong>Date and Time:</strong> ${new Date(jobStatus.interviewDate).toLocaleString()}</p>
-                    <p>Click the link below to join the video call at the scheduled time:</p>
-                    <a href="${videoCallUrl}" style="background-color: #28a745; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px;">Join Video Call</a>
+                    <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
+                        <tr>
+                            <td style="text-align: center; padding-bottom: 20px;">
+                                <img src="https://res.cloudinary.com/dca8kjdlq/image/upload/v1731754143/myfavicon_dokhmh.png" alt="Logo Công ty" style="width: 80px; border-radius: 50%; margin-bottom: 20px;"/>
+                                <h2 style="color: #333333; margin-bottom: 0;">Xác Nhận Tham Gia Phỏng Vấn</h2>
+                                <p style="color: #666666; margin-top: 5px;">Bạn đã xác nhận tham gia buổi phỏng vấn thành công</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                                <p>Xin chào ${candidate.firstName},</p>
+                                <p>Bạn đã xác nhận tham gia buổi phỏng vấn thành công. Thông tin chi tiết như sau:</p>
+                                <p><strong>Ngày và Giờ:</strong> ${new Date(jobStatus.interviewDate).toLocaleString()}</p>
+                                <p>Vui lòng nhấn vào liên kết dưới đây để tham gia cuộc gọi video vào thời gian đã sắp xếp:</p>
+                                <div style="display: block; margin-bottom: 10px;">
+                                    <p style="margin-bottom: 10px;">Mật khẩu để tham gia phòng là: 
+                                        <span style="font-weight: bold; font-size: 1rem; background-color: #f5f5f5; padding: 8px; border-radius: 4px;">
+                                            ${data}
+                                        </span>
+                                    </p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center; padding: 20px;">
+                                <a href="${videoCallUrl}" style="background-color: #28a745; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Tham Gia Cuộc Gọi Video</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-top: 20px; font-size: 14px; color: #888888; text-align: center; border-top: 1px solid #eeeeee;">
+                                <p>Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi qua email ${process.env.EMAIL_USER}.</p>
+                                <p>Trân trọng,<br><strong>Đội Ngũ Tuyển Dụng Công Ty</strong></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center; font-size: 12px; color: #aaaaaa; padding-top: 20px;">
+                                <p>© ${new Date().getFullYear()} Công Ty. Mọi quyền được bảo lưu.</p>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
-            `,
+            `
         };
 
         await transporter.sendMail(mailOptions);
@@ -757,7 +797,7 @@ const acceptInterview = async(req, res) => {
 
 
 // Function to reschedule the interview
-const rescheduleInterview = async(req, res) => {
+const rescheduleInterview = async (req, res) => {
     const { jobStatusId } = req.params;
     const { newDate } = req.body;
 
@@ -800,7 +840,7 @@ const rescheduleInterview = async(req, res) => {
     }
 };
 
-const getInterviewConfirmedCandidates = async(req, res) => {
+const getInterviewConfirmedCandidates = async (req, res) => {
     try {
         const authorId = req.params.id; // ID của công ty
 
@@ -832,17 +872,9 @@ const getInterviewConfirmedCandidates = async(req, res) => {
             status: "Interview Confirmed",
         });
 
-        if (jobStatusItems.length === 0) {
-            return res.status(404).json({
-                message: 'No candidates with "Interview Confirmed" status found',
-                data: [],
-                isSuccess: false,
-            });
-        }
-
         // Lấy thông tin ứng viên, phòng phỏng vấn và companyKey
-        const candidates = await Promise.all(jobStatusItems.map(async(jobStatus) => {
-            const user = await User.findById(jobStatus.userid, "firstName lastName email");
+        const candidates = await Promise.all(jobStatusItems.map(async (jobStatus) => {
+            const user = await User.findById(jobStatus.userid);
             const post = posts.find(p => p._id.equals(jobStatus.postid));
             const room = await Room.findOne({ "name": `${jobStatus.userid.toString()}-${jobStatus.companyid.toString()}` });
             return {
@@ -873,6 +905,81 @@ const getInterviewConfirmedCandidates = async(req, res) => {
     }
 };
 
+const getCandidateWithStatus = async (req, res) => {
+    try {
+        const authorId = req.params.id; // ID của công ty
+
+        const status = req.params.status.split(',').map(s => s.trim());
+
+        if (status.length === 0) {
+            return res.status(400).json({
+                message: 'At least one status must be provided',
+                data: null,
+                isSuccess: false,
+            });
+        }
+        if (!mongoose.Types.ObjectId.isValid(authorId)) {
+            return res.status(400).json({
+                message: 'Invalid author ID format',
+                data: null,
+                isSuccess: false,
+            });
+        }
+
+        // Tìm các bài đăng do công ty tạo
+        const posts = await Post.find({ "author.id": authorId }, "_id title");
+
+        if (posts.length === 0) {
+            return res.status(404).json({
+                message: 'No job posts found for this author',
+                data: [],
+                isSuccess: false,
+            });
+        }
+
+        // Lấy các ID bài đăng
+        const postIds = posts.map(post => post._id);
+        // Tìm các trạng thái công việc có status "Interview Confirmed"
+        
+        const jobStatusItems = await JobStatus.find({
+            postid: { $in: postIds },
+            status: { $in: status },
+        });
+
+        // Lấy thông tin ứng viên, phòng phỏng vấn và companyKey
+        const candidates = await Promise.all(jobStatusItems.map(async (jobStatus) => {
+            const user = await User.findById(jobStatus.userid, "firstName lastName email");
+            const post = posts.find(p => p._id.equals(jobStatus.postid));
+            const room = await Room.findOne({ "name": `${jobStatus.userid.toString()}-${jobStatus.companyid.toString()}` });
+            return {
+                id: jobStatus._id,
+                user,
+                jobTitle: post ? post.title : "Unknown",
+                postId: jobStatus.postid,
+                cv: jobStatus.cvUrl,
+                coverLetter: jobStatus.coverLetter,
+                status: jobStatus.status,
+                interviewDate: jobStatus.interviewDate || null,
+                roomKey: room ? room.userkey : null, // Hoặc sử dụng companykey tùy nhu cầu
+                companyKey: room ? room.companykey : null, // Thêm companyKey vào đối tượng ứng viên
+            };
+        }));
+
+        return res.status(200).json({
+            message: 'Interview candidates fetched successfully',
+            data: candidates,
+            isSuccess: true,
+        });
+    } catch (error) {
+        console.error('Error fetching interview candidates:', error);
+        res.status(500).json({
+            message: 'Failed to fetch interview candidates',
+            data: null,
+            isSuccess: false,
+        });
+    }
+}
+
 module.exports = {
     getJobstatusDetails,
     getJobStatus,
@@ -891,5 +998,6 @@ module.exports = {
     scheduleInterview,
     acceptInterview,
     rescheduleInterview,
-    getInterviewConfirmedCandidates
+    getInterviewConfirmedCandidates,
+    getCandidateWithStatus
 };

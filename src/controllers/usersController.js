@@ -100,13 +100,12 @@ const updateUser = async (req, res) => {
   }
 };
 
+
 const searchUsers = async (req, res) => {
   try {
     const query = req.query.searchTerm;
     const searchResults = await User.find({
       $or: [
-        { username: { $regex: query, $options: "i" } },
-        { email: { $regex: query, $options: "i" } },
         { firstName: { $regex: query, $options: "i" } },
         { lastName: { $regex: query, $options: "i" } }
       ],

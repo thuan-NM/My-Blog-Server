@@ -50,7 +50,8 @@ const io = new Server(server, {
 });
 
 // Import file xử lý Socket.IO
-require("./controllers/messageController")(io);
+const { socket } = require("./controllers/messageController");
+socket(io); // Đảm bảo gọi hàm socket với đối tượng io
 server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
     connectDb();
