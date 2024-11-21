@@ -2,9 +2,9 @@ const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
 const Company = require('../models/Company');
 const Post = require('../models/Post');
-const Comment = require("../models/Comment");
+const streamifier = require('streamifier');
 
-const getCompanies = async(req, res) => {
+const getCompanies = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const pageSize = parseInt(req.query.pageSize) || 20;
@@ -36,7 +36,7 @@ const getCompanies = async(req, res) => {
     }
 };
 
-const getCompanyById = async(req, res) => {
+const getCompanyById = async (req, res) => {
     try {
         const id = req.params.id;
 
@@ -72,21 +72,21 @@ const getCompanyById = async(req, res) => {
     }
 };
 
-const updateCompany = async(req, res) => {
+const updateCompany = async (req, res) => {
     const { email, companyname, field, phoneNumber, numberOfEmployees, socialMediaLinks, location } = req.body;
     try {
         const id = req.params.id;
 
         const updatedCompany = await Company.findByIdAndUpdate(
             id, {
-                email,
-                companyname,
-                field,
-                phoneNumber,
-                numberOfEmployees,
-                socialMediaLinks,
-                location,
-            }, { new: true }
+            email,
+            companyname,
+            field,
+            phoneNumber,
+            numberOfEmployees,
+            socialMediaLinks,
+            location,
+        }, { new: true }
         );
 
         if (!updatedCompany) {
@@ -112,7 +112,7 @@ const updateCompany = async(req, res) => {
     }
 };
 
-const searchCompanies = async(req, res) => {
+const searchCompanies = async (req, res) => {
     try {
         const query = req.query.searchTerm;
         const searchResults = await Company.find({
@@ -137,7 +137,7 @@ const searchCompanies = async(req, res) => {
     }
 };
 
-const updateCoverPicture = async(req, res) => {
+const updateCoverPicture = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'Vui lòng chọn ảnh' });
@@ -161,29 +161,68 @@ const updateCoverPicture = async(req, res) => {
     }
 };
 
-const updatePictures = async(req, res) => {
+const updatePictures = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'Vui lòng chọn ảnh' });
         }
+        console.log('req.params.id:', req.params.id);
+        console.log('req.file:', req.file);
 
-        const imageBuffer = req.file.buffer.toString('base64');
+        const uploadFromBuffer = () => {
+            return new Promise((resolve, reject) => {
+                const upload_stream = cloudinary.uploader.upload_stream(
+                    {
+                        folder: 'profile-pictures',
+                        public_id: `${req.params.id}_${Date.now()}`
+                    },
+                    async (error, result) => {
+                        if (error) {
+                            console.error('Error uploading to Cloudinary:', error);
+                            await session.abortTransaction();
+                            session.endSession();
+                            return reject(error);
+                        }
 
-        const result = await cloudinary.uploader.upload(`data:image/png;base64,${imageBuffer}`, {
-            folder: 'profile-pictures',
-            public_id: `${req.params.id}_${Date.now()}`
-        });
+                        const profilePictureUrl = result.secure_url;
 
-        const profilePictureUrl = result.secure_url;
+                        try {
+                            // Update the company's profile picture URL
+                            await Company.findByIdAndUpdate(req.params.id, { profilePictureUrl }, { session });
 
-        await Company.findByIdAndUpdate(req.params.id, { profilePictureUrl });
-        await Post.updateMany({ 'author._id': req.params.id }, { 'author.userdata.profilePictureUrl': profilePictureUrl });
-        await Comment.updateMany({ 'author._id': req.params.id }, { 'author.profilePictureUrl': profilePictureUrl });
+                            // Update the profile picture URL in all posts authored by the company
+                            await Post.updateMany(
+                                { 'author.id': req.params.id },
+                                { $set: { 'author.userdata.profilePictureUrl': profilePictureUrl } },
+                                { session }
+                            );
 
-        res.json({ message: 'Successfully', profilePictureUrl });
+                            await session.commitTransaction();
+                            session.endSession();
+
+                            res.json({ message: 'Successfully updated profile picture', profilePictureUrl });
+                            resolve(result);
+                        } catch (dbError) {
+                            console.error('Database update error:', dbError);
+                            await session.abortTransaction();
+                            session.endSession();
+                            reject(dbError);
+                        }
+                    }
+                );
+
+                // Stream the file buffer to Cloudinary
+                streamifier.createReadStream(req.file.buffer).pipe(upload_stream);
+            });
+        };
+
+        await uploadFromBuffer();
+
     } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({ error: 'Error' });
+        console.error('Error updating profile picture:', error);
+        res.status(500).json({ error: 'Error updating profile picture' });
     }
 };
 

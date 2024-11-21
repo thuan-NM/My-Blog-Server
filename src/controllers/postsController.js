@@ -437,16 +437,11 @@ const createPost = async (req, res) => {
 
 // UPDATE post
 const updatePost = async(req, res) => {
-    const { title, content, author, hashtags } = req.body;
+    const data = req.body;
     try {
         const id = req.params.id;
-        const post = await Post.findByIdAndUpdate(id, {
-            title,
-            content,
-            author,
-            hashtags,
-        }, { new: true });
-
+        const post = await Post.findByIdAndUpdate(id,data, { new: true });
+        console.log(post)
         res.status(200).json({
             message: "Update post by id successful",
             data: post,

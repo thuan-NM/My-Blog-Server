@@ -18,15 +18,15 @@ const sendVerificationEmail = async (user, token) => {
     });
 
     const mailOptions = {
-        from: `"Meow Blog" <${process.env.EMAIL_USER}>`,
+        from: `"KatzDev" <${process.env.EMAIL_USER}>`,
         to: user.email,
-        subject: `Xác Minh Email - ${candidate.firstName} ${candidate.lastName}`,
+        subject: `XÁC MINH EMAIL - ${candidate.firstName} ${candidate.lastName}`,
         html: `
             <div style="background-color: #f9f9f9; padding: 20px; font-family: Arial, sans-serif;">
                 <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
                     <tr>
-                        <td style="text-align: center; padding-bottom: 20px;">
-                            <img src="https://res.cloudinary.com/dca8kjdlq/image/upload/v1731754143/myfavicon_dokhmh.png" alt="Logo Công ty" style="width: 80px; border-radius: 50%; margin-bottom: 20px;"/>
+                        <td style="text-align: center;">
+                            <img src=${process.env.LOGO_URL} alt="Logo Công ty" style="width: 100%;"/>
                             <h2 style="color: #2d3748; margin-bottom: 10px;">Xin chào ${user.username},</h2>
                             <p style="color: #666666; margin-top: 5px;">Chúc mừng bạn đã đăng ký thành công!</p>
                         </td>
@@ -52,7 +52,7 @@ const sendVerificationEmail = async (user, token) => {
                     </tr>
                     <tr>
                         <td style="text-align: center; font-size: 12px; color: #aaaaaa; padding-top: 20px;">
-                            <p>© ${new Date().getFullYear()} Company. All rights reserved.</p>
+                                <p>© ${new Date().getFullYear()} KatzDev. Mọi quyền được bảo lưu.</p>
                         </td>
                     </tr>
                 </table>

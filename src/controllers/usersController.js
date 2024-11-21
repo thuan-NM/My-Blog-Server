@@ -126,31 +126,55 @@ const searchUsers = async (req, res) => {
   }
 };
 
+// controllers/usersController.js
 const updatePictures = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Vui lòng chọn ảnh' });
-    }
+    } 
+    console.log(req.params.id)
+    // Upload the image to Cloudinary
+    const result = await cloudinary.uploader.upload_stream(
+      {
+        folder: 'profile-pictures',
+        public_id: `${req.params.id}_${Date.now()}`
+      },
+      async (error, result) => {
+        if (error) {
+          console.error('Error uploading to Cloudinary:', error);
+          return res.status(500).json({ error: 'Error uploading image' });
+        }
 
-    const imageBuffer = req.file.buffer.toString('base64');
+        const profilePictureUrl = result.secure_url;
 
-    const result = await cloudinary.uploader.upload(`data:image/png;base64,${imageBuffer}`, {
-      folder: 'profile-pictures',
-      public_id: `${req.params.id}_${Date.now()}`
-    });
+        // Update the user's profile picture URL
+        await User.findByIdAndUpdate(req.params.id, { profilePictureUrl }, { session });
 
-    const profilePictureUrl = result.secure_url;
+        await Post.updateMany(
+          { 'author.id': req.params.id },
+          { $set: { 'author.userdata.profilePictureUrl': profilePictureUrl } },
+          { session }
+        );
 
-    await User.findByIdAndUpdate(req.params.id, { profilePictureUrl });
-    await Post.updateMany({ 'author._id': req.params.id }, { 'author.userdata.profilePictureUrl': profilePictureUrl });
-    await Comment.updateMany({ 'author._id': req.params.id }, { 'author.profilePictureUrl': profilePictureUrl });
+        await session.commitTransaction();
+        session.endSession();
 
-    res.json({ message: 'Successfully', profilePictureUrl });
+        res.json({ message: 'Successfully updated profile picture', profilePictureUrl });
+      }
+    );
+
+    // Stream the file buffer to Cloudinary
+    req.pipe(result);
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Error' });
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error updating profile picture:', error);
+    res.status(500).json({ error: 'Error updating profile picture' });
   }
 };
+
 
 const updateCoverPicture = async (req, res) => {
   try {
