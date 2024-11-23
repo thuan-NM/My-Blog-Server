@@ -96,7 +96,10 @@ const updateCompany = async (req, res) => {
                 isSuccess: false,
             });
         }
-
+        await Post.updateMany(
+            { 'author.id': req.params.id },
+            { $set: { 'author.userdata': updatedCompany } },
+        );
         res.status(200).json({
             message: "Update company by id successful",
             data: updatedCompany,

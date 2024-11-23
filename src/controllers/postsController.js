@@ -25,7 +25,7 @@ const preprocessLocation = (location) => {
     return reconstructedAddress.substring(0, 256);
 };
 
-const getCoordinates = async(address) => {
+const getCoordinates = async (address) => {
     if (!address) {
         console.error('No address provided for geocoding.');
         return null;
@@ -71,7 +71,7 @@ const getCoordinates = async(address) => {
 };
 
 // GET posts
-const getPosts = async(req, res) => {
+const getPosts = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1; // Trang hiện tại (mặc định là 1)
         const pageSize = parseInt(req.query.pageSize) || 20; // Số bài viết mỗi trang (mặc định là 20)
@@ -254,7 +254,7 @@ const getFilterPost = async (req, res) => {
 };
 
 // GET post by id
-const getPostById = async(req, res) => {
+const getPostById = async (req, res) => {
     try {
         const id = req.params.id;
         const post = await Post.findById(id);
@@ -274,7 +274,7 @@ const getPostById = async(req, res) => {
 };
 
 // GET posts by user id with pagination
-const getPostByUserId = async(req, res) => {
+const getPostByUserId = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const pageSize = parseInt(req.query.pageSize) || 5;
@@ -314,7 +314,7 @@ const getPostByUserId = async(req, res) => {
 };
 
 // GET posts by company id with pagination
-const getPostByCompanyId = async(req, res) => {
+const getPostByCompanyId = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const pageSize = parseInt(req.query.pageSize) || 5;
@@ -366,7 +366,7 @@ const createPost = async (req, res) => {
         }
 
         // Lấy companyId từ req.user.id thay vì từ req.body.author.id để đảm bảo tính bảo mật
-        const companyId = req.user.id;
+        const companyId = req.body.author.id;
         const company = await Company.findById(companyId).select('-password -friend -friendRequests -username');
 
         if (!company) {
@@ -436,12 +436,19 @@ const createPost = async (req, res) => {
 };
 
 // UPDATE post
-const updatePost = async(req, res) => {
-    const data = req.body;
+const updatePost = async (req, res) => {
+    const { title, description, skills, location, price, workType } = req.body;
     try {
         const id = req.params.id;
-        const post = await Post.findByIdAndUpdate(id,data, { new: true });
-        console.log(post)
+        const post = await Post.findByIdAndUpdate(id, {
+            title,
+            description,
+            skills,
+            price,
+            workType,
+            "location.address": location,
+        }, { new: true });
+
         res.status(200).json({
             message: "Update post by id successful",
             data: post,
@@ -457,7 +464,7 @@ const updatePost = async(req, res) => {
 };
 
 // DELETE post by id
-const deletePost = async(req, res) => {
+const deletePost = async (req, res) => {
     try {
         const id = req.params.id;
         await Post.findByIdAndDelete(id);
@@ -477,7 +484,7 @@ const deletePost = async(req, res) => {
 };
 
 // SEARCH posts
-const searchPosts = async(req, res) => {
+const searchPosts = async (req, res) => {
     try {
         const query = req.query.searchTerm;
         const searchResults = await Post.find({
@@ -505,7 +512,7 @@ const searchPosts = async(req, res) => {
 };
 
 // GET top posts by reactions
-const getTopPosts = async(req, res) => {
+const getTopPosts = async (req, res) => {
     try {
         const topPostIds = await Reaction.aggregate([
             { $group: { _id: "$postId", totalReactions: { $sum: 1 } } },
@@ -532,7 +539,7 @@ const getTopPosts = async(req, res) => {
 };
 
 // GET most commented posts
-const getMostInterestPosts = async(req, res) => {
+const getMostInterestPosts = async (req, res) => {
     try {
         const topPostIds = await Comment.aggregate([
             { $group: { _id: "$postId", totalComments: { $sum: 1 } } },
@@ -558,7 +565,7 @@ const getMostInterestPosts = async(req, res) => {
     }
 };
 
-const getRelatedPosts = async(req, res) => {
+const getRelatedPosts = async (req, res) => {
     try {
         const postId = req.params.id;
 
