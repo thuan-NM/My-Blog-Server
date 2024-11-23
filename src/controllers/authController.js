@@ -20,7 +20,7 @@ const sendVerificationEmail = async (user, token) => {
     const mailOptions = {
         from: `"KatzDev" <${process.env.EMAIL_USER}>`,
         to: user.email,
-        subject: `XÁC MINH EMAIL - ${candidate.firstName} ${candidate.lastName}`,
+        subject: `XÁC MINH EMAIL - ${user.firstName} ${user.lastName}`,
         html: `
             <div style="background-color: #f9f9f9; padding: 20px; font-family: Arial, sans-serif;">
                 <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
@@ -90,7 +90,7 @@ const register = async (req, res) => {
             profilePictureUrl: "",
             isVerified: false, // Đặt là chưa xác minh
         });
-
+        console.log(country)
         // Tạo token xác minh
         const verificationToken = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
