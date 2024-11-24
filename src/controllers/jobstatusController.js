@@ -426,32 +426,32 @@ const requestConfirmation = async (req, res) => {
         const mailOptions = {
             from: `"KatzDev" <${process.env.EMAIL_USER}>`,
             to: candidate.email,
-            subject: `YÊU CẦU XÁC NHẬN PHỎNG VẤN - ${candidate.firstName} ${candidate.lastName}`,
+            subject: `YÊU CẦU XÁC NHẬN ỨNG TUYỂN - ${candidate.firstName} ${candidate.lastName}`,
             html: `
                 <div style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
                     <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
                         <tr>
                             <td style="text-align: center;">
                                 <img src=${process.env.LOGO_URL} alt="Logo Công ty" style="width: 100%;"/>
-                                <h2 style="color: #333333; margin-y: 0;">Yêu cầu xác nhận phỏng vấn</h2>
-                                <p style="color: #666666; margin-top: 5px;">Bạn có một yêu cầu xác nhận phỏng vấn</p>
+                                <h2 style="color: #333333; margin-y: 0;">Yêu cầu xác nhận đơn ứng tuyển</h2>
+                                <p style="color: #666666; margin-top: 5px;">Bạn có một yêu cầu xác nhận đơn ứng tuyển</p>
                             </td>
                         </tr>
                         <tr>
                             <td style="padding: 10px 0; font-size: 16px; line-height: 1.6; color: #333333;">
                                 <p>Xin chào ${candidate.firstName},</p>
                                 <p>Bạn đã nhận được yêu cầu xác nhận lại đơn ứng tuyển cho vị trí tại <strong>${job.author.userdata.companyname}</strong>.</p>
-                                <p>Vui lòng xác nhận tham gia phỏng vấn của bạn bằng cách nhấn vào nút bên trước 2 ngày tới:</p>
+                                <p>Vui lòng xác nhận đơn ứng tuyển của bạn bằng cách nhấn vào nút bên trước 2 ngày tới:</p>
                             </td>
                         </tr>
                         <tr>
                             <td style="text-align: center; padding: 20px;">
-                                <a href="${confirmationUrl}" style="background-color: #4CAF50; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Xác nhận phỏng vấn</a>
+                                <a href="${confirmationUrl}" style="background-color: #4CAF50; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">Xác nhận ứng tuyển</a>
                             </td>
                         </tr>
                         <tr>
                             <td style="padding-top: 20px; font-size: 14px; color: #888888; text-align: center; border-top: 1px solid #eeeeee;">
-                                <p>Nếu bạn không xác nhận trong thời gian quy định, yêu cầu phỏng vấn sẽ hết hạn.</p>
+                                <p>Nếu bạn không xác nhận trong thời gian quy định, yêu cầu xác nhận ứng tuyển sẽ hết hạn.</p>
                                 <p>Trân trọng,<br><strong>Đội ngũ KatzDev</strong></p>
                             </td>
                         </tr>
