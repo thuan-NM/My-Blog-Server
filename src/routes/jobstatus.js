@@ -16,10 +16,12 @@ const upload = multer({ dest: 'uploads/' }); // Lưu file tạm thời vào thư
 
 // Existing routes
 jobstatusRoute.get("/", jobstatusController.getJobStatus);
+jobstatusRoute.get('/search', jobstatusController.searchPostsWithJobStatus);
 jobstatusRoute.get("/applied", jobstatusController.getJobWithStartus);
 jobstatusRoute.get("/checkUserApplied", jobstatusController.checkUserApplied);
 jobstatusRoute.get("/candidate/:id", jobstatusController.getCandidateOfJob);
 jobstatusRoute.get("/:id", jobstatusController.getJobStatusByAuthor);
+jobstatusRoute.get('/applier/:id', jobstatusController.getJobStatusByApplier);
 jobstatusRoute.get('/details/:jobStatusId', jobstatusController.getJobstatusDetails);
 jobstatusRoute.post("/", verifyAuth, upload.single('cv'), jobstatusController.createJobStatus);
 jobstatusRoute.put("/:id", verifyAuth, jobstatusController.updateJobStatus);

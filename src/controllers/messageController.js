@@ -7,7 +7,6 @@ const socket = (io) => {
         // Lắng nghe sự kiện join vào room
         socket.on("join_room", ({ room }) => {
             socket.join(room);
-            console.log(`User joined room: ${room}`);
         });
 
         // Xử lý tin nhắn từ client
@@ -19,7 +18,6 @@ const socket = (io) => {
 
                 // Phát tin nhắn đến tất cả người trong room, bao gồm cả người gửi
                 io.to(data.room).emit("receive_message", message); // Sửa từ 'data' thành 'message'
-                console.log("Message emitted to room:", data.room);
             } catch (error) {
                 console.error("Error saving message:", error);
                 // Bạn có thể phát thêm sự kiện lỗi nếu cần
@@ -38,7 +36,6 @@ const socket = (io) => {
 
         // Xử lý khi ngắt kết nối
         socket.on("disconnect", () => {
-            console.log("User disconnected:", socket.id);
         });
     });
 };

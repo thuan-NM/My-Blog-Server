@@ -180,6 +180,7 @@ const getJobStatusByAuthor = async (req, res) => {
 const hireCandidate = async (req, res) => {
     const { postid } = req.body;
     const userid = req.params.id;
+
     if (!mongoose.Types.ObjectId.isValid(userid) || !mongoose.Types.ObjectId.isValid(postid)) {
         return res.status(400).json({
             message: 'Invalid user ID or post ID format',
@@ -187,7 +188,9 @@ const hireCandidate = async (req, res) => {
             isSuccess: false,
         });
     }
+
     try {
+        // Update job status
         const result = await JobStatus.updateOne({ userid, postid }, { $set: { status: 'Hired' } });
         if (result.nModified === 0) {
             return res.status(404).json({
@@ -196,20 +199,101 @@ const hireCandidate = async (req, res) => {
                 isSuccess: false,
             });
         }
+
+        // Fetch the job title from the job post
+        const jobPost = await Post.findById(postid);
+        if (!jobPost) {
+            return res.status(404).json({
+                message: 'Job post not found',
+                data: null,
+                isSuccess: false,
+            });
+        }
+
+        const jobTitle = jobPost.title + " At " + jobPost.author.userdata.companyname;
+
+        // Update user's position array
+        const userUpdateResult = await User.updateOne(
+            { _id: userid },
+            { $set: { position: jobTitle } }
+        );
+
+        if (userUpdateResult.nModified === 0) {
+            return res.status(404).json({
+                message: 'User not found or position not updated',
+                data: null,
+                isSuccess: false,
+            });
+        }
+
+        // Fetch the candidate and job post details for email
+        const candidate = await User.findById(userid);
+        const job = await Post.findById(postid);
+
+        // Send confirmation email
+        const transporter = nodemailer.createTransport({
+            service: 'Gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            },
+        });
+
+        const mailOptions = {
+            from: `"KatzDev" <${process.env.EMAIL_USER}>`,
+            to: candidate.email,
+            subject: `Chúc mừng! Bạn đã được tuyển dụng - ${candidate.firstName} ${candidate.lastName}`,
+            html: `
+                <div style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
+                    <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
+                        <tr>
+                            <td style="text-align: center;">
+                                <img src=${process.env.LOGO_URL} alt="Logo Công ty" style="width: 100%;"/>
+                                <h2 style="color: #333333; margin-y: 0;">Chúc mừng! Bạn đã được tuyển dụng</h2>
+                                <p style="color: #666666; margin-top: 5px;">Bạn đã được tuyển dụng cho vị trí tại <strong>${job.author.userdata.companyname}</strong>.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                                <p>Xin chào ${candidate.firstName},</p>
+                                <p>Bạn đã được tuyển dụng cho vị trí <strong>${jobTitle}</strong> tại <strong>${job.author.userdata.companyname}</strong>.</p>
+                                <p>Chúng tôi rất mong chờ sự gia nhập của bạn vào đội ngũ chúng tôi.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-top: 20px; font-size: 14px; color: #888888; text-align: center; border-top: 1px solid #eeeeee;">
+                                <p>Nếu bạn không nhận được thông tin thêm, vui lòng liên hệ với chúng tôi qua email ${process.env.EMAIL_USER}.</p>
+                                <p>Trân trọng,<br><strong>Đội ngũ KatzDev</strong></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center; font-size: 12px; color: #aaaaaa; padding-top: 20px;">
+                                <p>© ${new Date().getFullYear()} KatzDev. Mọi quyền được bảo lưu.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+
         return res.status(200).json({
-            message: 'Candidate hired successfully',
+            message: 'Candidate hired and email sent successfully',
             data: null,
             isSuccess: true,
         });
     } catch (error) {
         console.error('Error hiring candidate:', error);
         res.status(500).json({
-            message: 'Failed to hire candidate',
+            message: 'Failed to hire candidate and send email',
             data: null,
             isSuccess: false,
         });
     }
 };
+
+
 
 const denyCandidate = async (req, res) => {
     const { postid } = req.body;
@@ -230,20 +314,73 @@ const denyCandidate = async (req, res) => {
                 isSuccess: false,
             });
         }
+
+        // Fetch the candidate and job post details for email
+        const candidate = await User.findById(userid);
+        const job = await Post.findById(postid);
+
+        // Send denial email
+        const transporter = nodemailer.createTransport({
+            service: 'Gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            },
+        });
+
+        const mailOptions = {
+            from: `"KatzDev" <${process.env.EMAIL_USER}>`,
+            to: candidate.email,
+            subject: `Thông báo kết quả ứng tuyển - ${candidate.firstName} ${candidate.lastName}`,
+            html: `
+                <div style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
+                    <table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
+                        <tr>
+                            <td style="text-align: center;">
+                                <img src=${process.env.LOGO_URL} alt="Logo Công ty" style="width: 100%;"/>
+                                <h2 style="color: #333333; margin-y: 0;">Rất tiếc, bạn không được tuyển dụng</h2>
+                                <p style="color: #666666; margin-top: 5px;">Chúng tôi rất tiếc phải thông báo bạn không được chọn cho vị trí tại <strong>${job.author.userdata.companyname}</strong>.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                                <p>Xin chào ${candidate.firstName},</p>
+                                <p>Chúng tôi rất tiếc phải thông báo rằng bạn không được chọn cho vị trí <strong>${job.title}</strong> tại <strong>${job.author.userdata.companyname}</strong>.</p>
+                                <p>Chúc bạn sẽ tìm được cơ hội tốt hơn trong tương lai.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-top: 20px; font-size: 14px; color: #888888; text-align: center; border-top: 1px solid #eeeeee;">
+                                <p>Trân trọng,<br><strong>Đội ngũ KatzDev</strong></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center; font-size: 12px; color: #aaaaaa; padding-top: 20px;">
+                                <p>© ${new Date().getFullYear()} KatzDev. Mọi quyền được bảo lưu.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+
         return res.status(200).json({
-            message: 'Candidate denied successfully',
+            message: 'Candidate denied and email sent successfully',
             data: null,
             isSuccess: true,
         });
     } catch (error) {
         console.error('Error denying candidate:', error);
         res.status(500).json({
-            message: 'Failed to deny candidate',
+            message: 'Failed to deny candidate and send email',
             data: null,
             isSuccess: false,
         });
     }
 };
+
 
 const getJobWithStartus = async (req, res) => {
     try {
@@ -480,7 +617,6 @@ const requestConfirmation = async (req, res) => {
         });
     }
 };
-
 
 
 // Endpoint to handle interview confirmation
@@ -939,7 +1075,7 @@ const getCandidateWithStatus = async (req, res) => {
 
         // Lấy thông tin ứng viên, phòng phỏng vấn và companyKey
         const candidates = await Promise.all(jobStatusItems.map(async (jobStatus) => {
-            const user = await User.findById(jobStatus.userid, "firstName lastName email");
+            const user = await User.findById(jobStatus.userid, "firstName lastName email profilePictureUrl");
             const post = posts.find(p => p._id.equals(jobStatus.postid));
             const room = await Room.findOne({ "name": `${jobStatus.userid.toString()}-${jobStatus.companyid.toString()}` });
             return {
@@ -971,6 +1107,101 @@ const getCandidateWithStatus = async (req, res) => {
     }
 }
 
+const getJobStatusByApplier = async (req, res) => {
+    try {
+        const userid = req.params.id;
+        if (!mongoose.Types.ObjectId.isValid(userid)) {
+            return res.status(400).json({
+                message: 'Invalid user ID format',
+                data: null,
+                isSuccess: false,
+            });
+        }
+        const jobStatuses = await JobStatus.find({ "userid": userid });
+        const jobs = await Promise.all(jobStatuses.map(async (jobStatus) => {
+            const post = await Post.findById(jobStatus.postid);
+            if (!post) return null;
+            return {
+                jobStatus: jobStatus,
+                post: post,
+            };
+        }));
+        // Filter out any null posts (in case of deleted posts)
+        const filteredJobs = jobs.filter(job => job !== null);
+        return res.status(200).json({
+            message: 'Get applied jobs successful',
+            data: filteredJobs,
+            isSuccess: true,
+        });
+    } catch (error) {
+        console.error('Error fetching applied jobs:', error);
+        res.status(500).json({
+            message: 'Failed to fetch applied jobs',
+            data: null,
+            isSuccess: false,
+        });
+    }
+};
+
+const searchPostsWithJobStatus = async (req, res) => {
+    try {
+        const { searchTerm, companyId } = req.query; // Nhận searchTerm và companyId từ query string
+        console.log(companyId)
+
+        if (!searchTerm) {
+            return res.status(400).json({
+                message: 'Search term is required',
+                data: null,
+                isSuccess: false,
+            });
+        }
+        const formattedSearchTerm = searchTerm.trim().replace(/\s+/g, '.*');  // Thay thế tất cả khoảng trắng bằng ".*"
+
+        // Tìm kiếm bài Post có chứa searchTerm trong title hoặc content
+        const posts = await Post.find({
+            $and: [
+                { title: { $regex: formattedSearchTerm, $options: 'i' } },  // Tìm kiếm theo title của bài viết
+                { "author.id": companyId } // Tìm kiếm theo content của bài viết
+            ]
+        });
+        // Sử dụng Promise.all để tối ưu quá trình truy vấn JobStatus cho từng Post
+        const updatedPosts = await Promise.all(posts.map(async (post) => {
+            const jobStatusCount = await JobStatus.countDocuments({
+                postid: post._id,
+                status: "Applied", // Tìm số lượng ứng viên có trạng thái "Applied"
+            });
+
+            // Trả về bài viết cùng với jobStatusCount
+            return {
+                ...post.toObject(), // Chuyển post thành object thuần JS
+                jobStatusCount,
+            };
+        }));
+
+        if (updatedPosts.length === 0) {
+            return res.status(404).json({
+                message: 'No posts found matching the search term',
+                data: null,
+                isSuccess: false,
+            });
+        }
+
+        return res.status(200).json({
+            message: 'Search posts successful',
+            data: updatedPosts,
+            isSuccess: true,
+        });
+    } catch (error) {
+        console.error('Error fetching posts with job status:', error);
+        res.status(500).json({
+            message: 'Failed to fetch posts with job status',
+            data: null,
+            isSuccess: false,
+        });
+    }
+};
+
+
 module.exports = {
     getJobstatusDetails,
     getJobStatus,
@@ -990,5 +1221,7 @@ module.exports = {
     acceptInterview,
     rescheduleInterview,
     getInterviewConfirmedCandidates,
-    getCandidateWithStatus
+    getCandidateWithStatus,
+    getJobStatusByApplier,
+    searchPostsWithJobStatus
 };
